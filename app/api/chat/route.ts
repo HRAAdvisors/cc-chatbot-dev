@@ -1,9 +1,7 @@
 import { streamText } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { nanoid } from 'nanoid';
-import { extractAddress, searchPoints, geocodeAddress } from '@/lib/address';
-import { parseTechRules, matchPlans, groupPlans } from '@/lib/plans';
-import { getServicesNearAddress, nationalServicesOnly } from '@/lib/services-lookup';
+import { extractAddress, geocodeAddress } from '@/lib/address';
 import { logChat } from '@/lib/analytics';
 
 const SYSTEM_PROMPT = `You are a friendly digital equity assistant for Clark County, Nevada. You help residents find internet service options and digital inclusion resources.
@@ -20,15 +18,20 @@ Guidelines:
 - Never make up plans or resources; only reference what's in the context block`;
 
 export async function POST(req: Request) {
-  const { messages, sessionId = nanoid(), contextBlock: clientContext = '' } = await req.json();
+  const {
+    messages,
+    sessionId = nanoid(),
+    contextBlock: clientContext = '',
+    intent,
+    numPlans,
+    numServices,
+  } = await req.json();
 
   // contextBlock is pre-built by the client from /api/lookup and passed here
   // so we avoid a second DB round-trip in this route
   let addressQueried = '';
   let lat: number | undefined;
   let lon: number | undefined;
-  let numPlans = 0;
-  let numServices = 0;
 
   // Parse address for analytics only (lookup was already done client-side)
   const lastUserMsg = messages.slice().reverse().find((m: { role: string }) => m.role === 'user');
@@ -46,8 +49,8 @@ export async function POST(req: Request) {
   logChat({
     sessionId,
     userMessage: lastUserMsg?.content || '',
-    intent: clientContext.includes('Internet plans') ? 'internet_offer'
-      : clientContext.includes('digital equity') ? 'digital_equity'
+    intent: intent === 'plans' ? 'internet_offer'
+      : intent === 'services' ? 'digital_equity'
       : 'other',
     addressQueried: addressQueried || undefined,
     lat,

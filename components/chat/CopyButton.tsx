@@ -32,7 +32,7 @@ export default function CopyButton({ text, className = '' }: Props) {
     <button
       onClick={handleCopy}
       title="Copy for SMS"
-      className={`inline-flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 transition-colors ${className}`}
+      className={`inline-flex items-center gap-1 text-sm text-slate-400 hover:text-blue-600 transition-colors ${className}`}
     >
       {copied ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
       {copied ? 'Copied!' : 'Copy'}

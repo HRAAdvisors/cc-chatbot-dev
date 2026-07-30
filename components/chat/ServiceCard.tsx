@@ -22,24 +22,24 @@ function ServiceRow({ service }: { service: ServiceWithDistance }) {
     <div className="border-b last:border-0 py-3 px-4">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-800">{service.name}</p>
-          <p className="text-xs text-gray-500 mt-0.5">{service.type}</p>
+          <p className="text-base font-medium text-slate-800">{service.name}</p>
+          <p className="text-sm text-slate-500 mt-0.5">{service.type}</p>
           {service.description && (
-            <p className="text-xs text-gray-500 mt-1 line-clamp-2">{service.description}</p>
+            <p className="text-sm text-slate-500 mt-1 line-clamp-2">{service.description}</p>
           )}
         </div>
         {service.distanceMiles != null && (
-          <span className="text-xs text-gray-400 shrink-0">{service.distanceMiles.toFixed(1)} mi</span>
+          <span className="text-sm text-slate-400 shrink-0">{service.distanceMiles.toFixed(1)} mi</span>
         )}
       </div>
       <div className="flex items-center gap-3 mt-2">
         {service.phone && (
-          <a href={`tel:${service.phone}`} className="text-xs text-blue-600 hover:underline">{service.phone}</a>
+          <a href={`tel:${service.phone}`} className="text-sm text-blue-600 hover:underline">{service.phone}</a>
         )}
         {service.url && (
           <a href={service.url} target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline">
-            Website <ExternalLink size={10} />
+            className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline">
+            Website <ExternalLink size={11} />
           </a>
         )}
         <CopyButton text={formatServiceSms(service)} />
@@ -74,9 +74,9 @@ export default function ServiceCard({ serviceGroups }: Props) {
   if (!hasAny) return null;
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden mt-3">
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden mt-3">
       <div className="px-4 py-3 bg-green-50 border-b border-green-100">
-        <p className="text-sm font-semibold text-green-800">Digital Equity Resources</p>
+        <p className="text-base font-semibold text-green-800">Digital Equity Resources</p>
       </div>
 
       {TIERS.map(({ key, label }) => {
@@ -84,14 +84,14 @@ export default function ServiceCard({ serviceGroups }: Props) {
         if (!services.length) return null;
         const isOpen = openTiers.has(key);
         return (
-          <div key={key} className="border-t border-gray-100 first:border-t-0">
+          <div key={key} className="border-t border-slate-100 first:border-t-0">
             <button
               onClick={() => toggle(key)}
-              className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="w-full flex items-center justify-between px-4 py-2.5 text-base font-medium text-slate-700 hover:bg-slate-50"
             >
               <span>{label}</span>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-400">{services.length} resource{services.length !== 1 ? 's' : ''}</span>
+                <span className="text-sm text-slate-400">{services.length} resource{services.length !== 1 ? 's' : ''}</span>
                 {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </div>
             </button>

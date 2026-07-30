@@ -25,12 +25,12 @@ function PlanRow({ plan, address }: { plan: Plan; address?: string }) {
     <div className="border-b last:border-0 py-3 px-4">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-800 truncate">{plan.planName || plan.provider}</p>
-          <p className="text-xs text-gray-500">{plan.technology}</p>
+          <p className="text-base font-medium text-slate-800 truncate">{plan.planName || plan.provider}</p>
+          <p className="text-sm text-slate-500">{plan.technology}</p>
         </div>
         <div className="text-right shrink-0">
-          <p className="text-sm font-semibold text-gray-900">${plan.price}<span className="text-xs font-normal text-gray-500">/mo</span></p>
-          <p className="text-xs text-gray-500">{plan.downloadMbps}/{plan.uploadMbps} Mbps</p>
+          <p className="text-base font-semibold text-slate-900">${plan.price}<span className="text-sm font-normal text-slate-500">/mo</span></p>
+          <p className="text-sm text-slate-500">{plan.downloadMbps}/{plan.uploadMbps} Mbps</p>
         </div>
       </div>
       <div className="flex flex-wrap gap-2 mt-2">
@@ -71,17 +71,17 @@ export default function PlanCard({ planGroups, address }: Props) {
   const otherProviders = Object.entries(planGroups.byProvider);
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden mt-3">
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden mt-3">
       <div className="px-4 py-3 bg-blue-50 border-b border-blue-100">
-        <p className="text-sm font-semibold text-blue-800">Internet Plans Available</p>
-        {address && <p className="text-xs text-blue-600 mt-0.5">{address}</p>}
+        <p className="text-base font-semibold text-blue-800">Internet Plans Available</p>
+        {address && <p className="text-sm text-blue-600 mt-0.5">{address}</p>}
       </div>
 
       {hasThreshold && (
         <div>
           <button
             onClick={() => toggle('__threshold')}
-            className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="w-full flex items-center justify-between px-4 py-2.5 text-base font-medium text-slate-700 hover:bg-slate-50"
           >
             <span>High-speed plans (100/25 Mbps+)</span>
             {openProviders.has('__threshold') ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -93,14 +93,14 @@ export default function PlanCard({ planGroups, address }: Props) {
       )}
 
       {otherProviders.map(([provider, plans]) => (
-        <div key={provider} className="border-t border-gray-100">
+        <div key={provider} className="border-t border-slate-100">
           <button
             onClick={() => toggle(provider)}
-            className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="w-full flex items-center justify-between px-4 py-2.5 text-base font-medium text-slate-700 hover:bg-slate-50"
           >
             <span>{provider}</span>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400">{plans.length} plan{plans.length !== 1 ? 's' : ''}</span>
+              <span className="text-sm text-slate-400">{plans.length} plan{plans.length !== 1 ? 's' : ''}</span>
               {openProviders.has(provider) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </div>
           </button>
