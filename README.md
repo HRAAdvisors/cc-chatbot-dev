@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Clark County Digital Equity Assistant (`cc-chatbot-v2`)
 
-## Getting Started
+A Next.js chatbot that helps Clark County residents find internet plans and digital-equity resources available at their address, plus an `/admin` dashboard for reviewing usage analytics.
 
-First, run the development server:
+For a full breakdown of how the pieces fit together (routes, data stores, external services, known gaps), see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## What it does
+
+1. A resident types their address and a question into the chatbot ([components/chat/Chatbot.tsx](components/chat/Chatbot.tsx)).
+2. The app geocodes the address (OpenStreetMap Nominatim), checks broadband availability (Neon Postgres `points` table), matches ISP plans from a bundled CSV, and finds nearby digital-equity resources — all via `POST /api/lookup`.
+3. That result is folded into a context block sent to Claude (`claude-sonnet-4-6`, via `POST /api/chat`), which streams back a conversational answer alongside plan/service cards.
+4. Every exchange is logged to Postgres (`chat_logs`) for the `/admin` analytics dashboard.
+
+## Tech stack
+
+- **Next.js 16** (App Router) + **React 19** + **TypeScript**
+- **Tailwind CSS v4** + **shadcn/ui**
+- **Vercel AI SDK** (`ai`, `@ai-sdk/anthropic`, `@ai-sdk/react`) → Anthropic Claude
+- **Neon** serverless Postgres (`@neondatabase/serverless`)
+- **Papaparse** for the bundled plans CSV
+- **Recharts** for the admin dashboard
+
+## Getting started
+
+Requires the env vars below in `.env.local`, then:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). (Note: the Claude Code preview config in `.claude/launch.json` runs dev on port **3001** instead — `npm run dev -- -p 3001`.)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Create `.env.local` (git-ignored, no `.env.example` is checked in yet) with:
 
-## Learn More
+| Variable | Required | Purpose |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Yes | Claude API auth, used by `/api/chat` |
+| `DATABASE_URL` | Yes | Neon Postgres connection string |
+| `ADMIN_SECRET` | Yes | Password checked by `/api/admin/login` |
+| `REACT_APP_API_URL`, `MAPBOX_API_KEY`, `S3_BUCKET`, `S3_POINTS_KEY`, `AWS_REGION` | No | Not currently read by any code — leftovers from an earlier iteration; safe to omit |
 
-To learn more about Next.js, take a look at the following resources:
+The `points` and `chat_logs` tables must already exist on the Neon instance — there are no migration files in this repo (see [ARCHITECTURE.md §3](ARCHITECTURE.md#3-data-stores--static-data)).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Scripts
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run dev     # start dev server (next dev)
+npm run build   # production build
+npm run start   # run the production build
+npm run lint    # eslint
+```
 
-## Deploy on Vercel
+There is no `deploy` script and no CI/CD or infra-as-code committed to this repo — see [ARCHITECTURE.md §6](ARCHITECTURE.md#6-hosting--infrastructure--current-state) for what's missing to make deployment reproducible.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Known gaps
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **`/admin` is effectively unauthenticated in practice.** The login flow sets an `admin_auth` cookie, but [middleware.ts](middleware.ts) is currently a no-op and nothing validates that cookie before serving `/admin` pages or `GET /api/admin/analytics`. Fix before any real deployment — see [ARCHITECTURE.md §2](ARCHITECTURE.md#2-logical-services-all-inside-one-app).
+- No schema migrations for the Postgres tables the app depends on.
+- No hosting config checked in (Vercel-shaped stack, but no `vercel.json`).
+
+## Project structure
+
+See [ARCHITECTURE.md §8](ARCHITECTURE.md#8-directory-reference) for the full directory reference.
