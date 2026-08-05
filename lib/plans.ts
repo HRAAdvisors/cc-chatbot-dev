@@ -1,22 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import Papa from 'papaparse';
+import type { Plan, PlanGroups } from './plan-utils';
 
-export interface Plan {
-  planName: string; provider: string; technology: string;
-  price: string; introDiscount: string; introPeriod: string;
-  downloadMbps: string; uploadMbps: string;
-  dataCap: string; dataCapGB: string;
-  contract: string; contractMonths: string;
-  otherFees: string; otherFeesNote: string; installFee: string;
-  etf: string; lowIncome: string; liDiscount: string;
-  meetsThreshold: boolean;
-}
-
-export interface PlanGroups {
-  threshold: Plan[];
-  byProvider: Record<string, Plan[]>;
-}
+export type { Plan, PlanGroups } from './plan-utils';
 
 // Load once at module init
 const raw = fs.readFileSync(path.join(process.cwd(), 'public', 'plans_with_tech.csv'), 'utf8');

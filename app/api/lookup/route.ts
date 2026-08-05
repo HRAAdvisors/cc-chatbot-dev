@@ -7,6 +7,7 @@ interface LookupResponse {
   planGroups: PlanGroups | null;
   serviceGroups: ServiceGroups | null;
   found: boolean;
+  validated: boolean;
   lat?: number;
   lon?: number;
   address?: string;
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
 
   const parsed = extractAddress(text);
   if (!parsed) {
-    return Response.json({ planGroups: null, serviceGroups: null, found: false });
+    return Response.json({ planGroups: null, serviceGroups: null, found: false, validated: false });
   }
 
   const cacheKey = `${parsed.addr}|${parsed.city ?? ''}|${parsed.state}|${parsed.zip}`;
@@ -34,16 +35,20 @@ export async function POST(req: Request) {
     return Response.json(cached);
   }
 
-  const [row, geoResult] = await Promise.all([
-    searchPoints(parsed),
-    geocodeAddress(parsed.addr, parsed.city, parsed.state, parsed.zip),
-  ]);
+  // Validate the address against OpenStreetMap before ever touching the FCC
+  // broadband dataset — an address OSM can't locate isn't worth searching for.
+  const geoResult = await geocodeAddress(parsed.addr, parsed.city, parsed.state, parsed.zip);
+  if (!geoResult) {
+    const invalid: LookupResponse = { planGroups: null, serviceGroups: null, found: false, validated: false };
+    lookupCache.set(cacheKey, invalid, NOT_FOUND_TTL_MS);
+    return Response.json(invalid);
+  }
 
-  const lat = geoResult?.lat ?? (row ? Number(row.LATITUDE) : undefined);
-  const lon = geoResult?.lon ?? (row ? Number(row.LONGITUDE) : undefined);
+  const row = await searchPoints(parsed);
+  const { lat, lon } = geoResult;
 
   if (!row) {
-    const notFound: LookupResponse = { planGroups: null, serviceGroups: nationalServicesOnly(), found: false };
+    const notFound: LookupResponse = { planGroups: null, serviceGroups: nationalServicesOnly(), found: false, validated: true, lat, lon };
     lookupCache.set(cacheKey, notFound, NOT_FOUND_TTL_MS);
     return Response.json(notFound);
   }
@@ -51,10 +56,10 @@ export async function POST(req: Request) {
   const techsAtAddress = parseTechRules(row.TECHRULES);
   const matched = matchPlans(row.BRANDNAMES, techsAtAddress, row.BLD_TYPE);
   const planGroups = groupPlans(matched);
-  const serviceGroups = (lat && lon) ? getServicesNearAddress(lat, lon) : nationalServicesOnly();
+  const serviceGroups = getServicesNearAddress(lat, lon);
 
   const response: LookupResponse = {
-    planGroups, serviceGroups, found: true, lat, lon,
+    planGroups, serviceGroups, found: true, validated: true, lat, lon,
     address: `${row.ADDR}, ${row.CITY}, ${row.STATE} ${row.ZIP}`,
   };
   lookupCache.set(cacheKey, response);

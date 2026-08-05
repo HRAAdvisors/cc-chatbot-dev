@@ -3,9 +3,19 @@ import { useCallback, useEffect, useRef, useState, Fragment } from 'react';
 import { Send } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import PromptSuggestions, { type PromptIntent } from './PromptSuggestions';
-import PlanCard from './PlanCard';
+import PlanCard, { RecommendedPlanCard } from './PlanCard';
 import ServiceCard from './ServiceCard';
-import type { PlanGroups, Plan } from '@/lib/plans';
+import ChoiceButtons from './ChoiceButtons';
+import {
+  flattenPlans,
+  recommendPlan,
+  HOUSEHOLD_SIZE_OPTIONS,
+  USAGE_PROFILE_OPTIONS,
+  type PlanGroups,
+  type Plan,
+  type HouseholdSize,
+  type UsageProfile,
+} from '@/lib/plan-utils';
 import type { ServiceGroups, ServiceWithDistance } from '@/lib/services-lookup';
 
 interface Message {
@@ -20,11 +30,28 @@ interface LookupResult {
   planGroups: PlanGroups | null;
   serviceGroups: ServiceGroups | null;
   found: boolean;
+  validated?: boolean;
   address?: string;
   intent: Intent;
 }
 
 type ResultMap = Map<string, LookupResult>;
+
+// Steps 5-8 of the internet-offer flow: show the headline plans first, then
+// branch into "see everything" or a guided household-size/usage recommendation.
+type PlanFlowStep = 'idle' | 'top_shown' | 'awaiting_household' | 'awaiting_usage' | 'all_shown' | 'recommended_shown';
+
+interface PlanFlowState {
+  step: PlanFlowStep;
+  sourceMsgId?: string;
+  planGroups?: PlanGroups;
+  address?: string;
+  householdSize?: HouseholdSize;
+  recommendedPlan?: Plan | null;
+  recommendationNote?: string;
+}
+
+const IDLE_PLAN_FLOW: PlanFlowState = { step: 'idle' };
 
 const ADDRESS_RE = /\d+[\w\s.#-]+(?:street|avenue|boulevard|drive|road|lane|court|place|circle|highway|parkway|square|st|ave|blvd|dr|rd|ln|ct|way|pl|cir|hwy|pkwy|loop|sq)/i;
 
@@ -126,6 +153,7 @@ export default function Chatbot() {
   const [resultMap, setResultMap] = useState<ResultMap>(new Map());
   const [activeIntent, setActiveIntent] = useState<Intent>('both');
   const [lastLookup, setLastLookup] = useState<Omit<LookupResult, 'intent'> | null>(null);
+  const [planFlow, setPlanFlow] = useState<PlanFlowState>(IDLE_PLAN_FLOW);
   const bottomRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -135,6 +163,11 @@ export default function Chatbot() {
 
   const sendMessage = useCallback(async (text: string, intentOverride?: Intent) => {
     if (isStreaming) return;
+
+    // Any new chat turn (typed text or a fresh main-menu prompt) breaks out of
+    // the guided plan-recommendation flow — it gets re-armed below if this
+    // turn triggers a new address lookup.
+    setPlanFlow(IDLE_PLAN_FLOW);
 
     const detectedIntent = classifyIntent(text);
     const prevIntent = activeIntent;
@@ -201,7 +234,9 @@ export default function Chatbot() {
           );
         }
 
-        const instructions = !result.found
+        const instructions = result.validated === false
+          ? 'The address could not be validated against OpenStreetMap — it may be misspelled or incomplete. Ask the user to double-check the spelling or add more detail (unit number, cross street, or ZIP). Do not mention plans or resources yet.'
+          : !result.found
           ? `No FCC broadband database record was found for this exact address, so plan matching may be incomplete — let the user know and suggest they double-check the address or try a nearby cross street.${showPlans ? ' Also suggest contacting ISPs directly (Cox, AT&T, CenturyLink, Spectrum serve Clark County).' : ''}`
           : 'Use ONLY the data above — do not mention or invent any provider, plan, or resource that is not listed.';
 
@@ -212,10 +247,15 @@ export default function Chatbot() {
           showPlans && !showServices ? 'The user only asked about internet plans — do not mention digital equity resources or training programs.' : '',
           showServices && !showPlans ? 'The user only asked about digital equity/training/device resources — do not mention internet plans or pricing.' : '',
           isPivot ? "The user already gave their address earlier and is now asking about a different topic — don't ask them to repeat the address, just answer using the data above." : '',
+          result.planGroups && showPlans ? 'The lowest-cost and fastest plan are already highlighted below your message — do not restate every plan in detail; the user will be offered the choice to see all plans or get a personalized recommendation next.' : '',
           'Keep your reply short — the card(s) below your message already show full details.',
         ].filter(Boolean).join('\n\n');
 
         setResultMap(prev => new Map(prev).set(userMsgId, { ...result, intent }));
+
+        if (showPlans && result.planGroups) {
+          setPlanFlow({ step: 'top_shown', sourceMsgId: userMsgId, planGroups: result.planGroups, address: result.address });
+        }
       } catch {
         // Lookup failed — chat continues without cards
       }
@@ -259,6 +299,44 @@ export default function Chatbot() {
     }
   }, [isStreaming, messages, activeIntent, lastLookup]);
 
+  const appendAssistantText = useCallback((text: string) => {
+    setMessages(prev => [...prev, { id: nanoid(), role: 'assistant', content: text }]);
+  }, []);
+
+  const closingLine = "Thanks for using the Clark County Digital Equity Assistant — let me know if there's anything else I can help you with!";
+
+  const handleSeeAllPlans = useCallback(() => {
+    appendAssistantText(`Here are all the internet plans available at your address. ${closingLine}`);
+    setPlanFlow(f => ({ ...f, step: 'all_shown' }));
+  }, [appendAssistantText]);
+
+  const handleGetRecommendation = useCallback(() => {
+    appendAssistantText('Happy to help you find the right fit. First, how many people live in your household?');
+    setPlanFlow(f => ({ ...f, step: 'awaiting_household' }));
+  }, [appendAssistantText]);
+
+  const handleHouseholdSize = useCallback((size: HouseholdSize) => {
+    appendAssistantText("Thanks! And which best describes how your household uses the internet?");
+    setPlanFlow(f => ({ ...f, step: 'awaiting_usage', householdSize: size }));
+  }, [appendAssistantText]);
+
+  const handleUsage = useCallback((usage: UsageProfile) => {
+    if (!planFlow.planGroups || !planFlow.householdSize) return;
+    const { plan, metRecommendedSpeed } = recommendPlan(flattenPlans(planFlow.planGroups), planFlow.householdSize, usage);
+    const intro = plan
+      ? metRecommendedSpeed
+        ? "Based on your household size and internet use, here's our recommended plan."
+        : "None of the available plans fully meet the ideal speed for your household, but here's the fastest option available."
+      : "We couldn't find a matching plan for your address.";
+    appendAssistantText(`${intro} ${closingLine}`);
+    setPlanFlow(f => ({
+      ...f,
+      step: 'recommended_shown',
+      recommendedPlan: plan,
+      recommendationNote: metRecommendedSpeed ? undefined : 'This plan doesn’t fully meet the ideal speed for your household, but it’s the fastest one available at your address.',
+    }));
+  }, [planFlow, appendAssistantText]);
+
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isStreaming) return;
@@ -290,7 +368,8 @@ export default function Chatbot() {
           {messages.map((m, i) => {
             const isUser = m.role === 'user';
             const isLastMsg = i === messages.length - 1;
-            const result = isUser ? resultMap.get(m.id) : resultMap.get(messages[i - 1]?.id ?? '');
+            const resultKey = isUser ? m.id : (messages[i - 1]?.id ?? '');
+            const result = resultMap.get(resultKey);
 
             return (
               <div key={m.id}>
@@ -317,10 +396,42 @@ export default function Chatbot() {
                 {!isUser && result && (
                   <div className="mt-1">
                     {result.planGroups && result.intent !== 'services' && (
-                      <PlanCard planGroups={result.planGroups} address={result.address} />
+                      <PlanCard planGroups={result.planGroups} address={result.address} mode="top" />
                     )}
                     {result.serviceGroups && result.intent !== 'plans' && (
                       <ServiceCard serviceGroups={result.serviceGroups} />
+                    )}
+                  </div>
+                )}
+
+                {/* The guided flow's cards/controls always attach to the message the
+                    user is currently reading (the bottom of the chat), not to the
+                    original lookup reply — that message may be long scrolled past. */}
+                {!isUser && isLastMsg && !isStreaming && planFlow.step !== 'idle' && (
+                  <div className="mt-1">
+                    {planFlow.step === 'all_shown' && planFlow.planGroups && (
+                      <PlanCard planGroups={planFlow.planGroups} address={planFlow.address} mode="all" />
+                    )}
+                    {planFlow.step === 'recommended_shown' && planFlow.recommendedPlan && (
+                      <RecommendedPlanCard plan={planFlow.recommendedPlan} address={planFlow.address} note={planFlow.recommendationNote} />
+                    )}
+                    {planFlow.step === 'top_shown' && (
+                      <ChoiceButtons
+                        options={[
+                          { value: 'all', label: 'Show me all plans' },
+                          { value: 'recommend', label: 'Get a personalized recommendation' },
+                        ]}
+                        onSelect={(v: 'all' | 'recommend') => (v === 'all' ? handleSeeAllPlans() : handleGetRecommendation())}
+                      />
+                    )}
+                    {planFlow.step === 'awaiting_household' && (
+                      <ChoiceButtons options={HOUSEHOLD_SIZE_OPTIONS} onSelect={handleHouseholdSize} />
+                    )}
+                    {planFlow.step === 'awaiting_usage' && (
+                      <ChoiceButtons options={USAGE_PROFILE_OPTIONS} onSelect={handleUsage} />
+                    )}
+                    {(planFlow.step === 'all_shown' || planFlow.step === 'recommended_shown') && (
+                      <PromptSuggestions onSelect={sendMessage} />
                     )}
                   </div>
                 )}
