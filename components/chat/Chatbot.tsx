@@ -4,7 +4,9 @@ import { Send } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import PromptSuggestions, { type PromptIntent } from './PromptSuggestions';
 import PlanCard, { RecommendedPlanCard } from './PlanCard';
+import PlansTable from './PlansTable';
 import ServiceCard from './ServiceCard';
+import ServicesTable from './ServicesTable';
 import ChoiceButtons from './ChoiceButtons';
 import {
   flattenPlans,
@@ -16,7 +18,8 @@ import {
   type HouseholdSize,
   type UsageProfile,
 } from '@/lib/plan-utils';
-import type { ServiceGroups, ServiceWithDistance } from '@/lib/services-lookup';
+import { getTopServices, type ServiceGroups, type ServiceWithDistance } from '@/lib/services-lookup';
+import { SERVICE_TYPES } from '@/lib/services';
 
 interface Message {
   id: string;
@@ -52,6 +55,20 @@ interface PlanFlowState {
 }
 
 const IDLE_PLAN_FLOW: PlanFlowState = { step: 'idle' };
+
+// Mirrors PlanFlowState's shape but kept separate — the two flows have
+// different steps/payloads and a shared generic engine wouldn't reduce the
+// actual per-step JSX, just add indirection.
+type ServiceFlowStep = 'idle' | 'top_shown' | 'all_shown' | 'awaiting_type' | 'filtered_shown';
+
+interface ServiceFlowState {
+  step: ServiceFlowStep;
+  sourceMsgId?: string;
+  serviceGroups?: ServiceGroups;
+  selectedType?: string;
+}
+
+const IDLE_SERVICE_FLOW: ServiceFlowState = { step: 'idle' };
 
 const ADDRESS_RE = /\d+[\w\s.#-]+(?:street|avenue|boulevard|drive|road|lane|court|place|circle|highway|parkway|square|st|ave|blvd|dr|rd|ln|ct|way|pl|cir|hwy|pkwy|loop|sq)/i;
 
@@ -146,6 +163,17 @@ function MarkdownContent({ text }: { text: string }) {
 
 const sessionId = nanoid();
 
+// Fire-and-forget: these selections happen entirely client-side (no /api/chat
+// call necessarily follows), so they're posted to their own endpoint rather
+// than piggybacked on the next chat turn, which may never come.
+function logSelection(fields: { householdSize?: string; usageProfile?: string; serviceType?: string }) {
+  fetch('/api/log-selection', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId, ...fields }),
+  }).catch(() => {});
+}
+
 export default function Chatbot() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -154,20 +182,30 @@ export default function Chatbot() {
   const [activeIntent, setActiveIntent] = useState<Intent>('both');
   const [lastLookup, setLastLookup] = useState<Omit<LookupResult, 'intent'> | null>(null);
   const [planFlow, setPlanFlow] = useState<PlanFlowState>(IDLE_PLAN_FLOW);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [serviceFlow, setServiceFlow] = useState<ServiceFlowState>(IDLE_SERVICE_FLOW);
+  const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const lastScrolledId = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Anchor the newest message's own top edge to the viewport top, rather than
+  // chasing the bottom of the chat — a tall PlanCard/ServiceCard rendered below
+  // a reply would otherwise push the reply itself off-screen above the fold.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isStreaming]);
+    const last = messages[messages.length - 1];
+    if (last && last.id !== lastScrolledId.current) {
+      lastScrolledId.current = last.id;
+      messageRefs.current.get(last.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [messages]);
 
   const sendMessage = useCallback(async (text: string, intentOverride?: Intent) => {
     if (isStreaming) return;
 
     // Any new chat turn (typed text or a fresh main-menu prompt) breaks out of
-    // the guided plan-recommendation flow — it gets re-armed below if this
-    // turn triggers a new address lookup.
+    // the guided plan-recommendation/service-filter flows — they get re-armed
+    // below if this turn triggers a new address lookup.
     setPlanFlow(IDLE_PLAN_FLOW);
+    setServiceFlow(IDLE_SERVICE_FLOW);
 
     const detectedIntent = classifyIntent(text);
     const prevIntent = activeIntent;
@@ -256,6 +294,9 @@ export default function Chatbot() {
         if (showPlans && result.planGroups) {
           setPlanFlow({ step: 'top_shown', sourceMsgId: userMsgId, planGroups: result.planGroups, address: result.address });
         }
+        if (showServices && result.serviceGroups) {
+          setServiceFlow({ step: 'top_shown', sourceMsgId: userMsgId, serviceGroups: result.serviceGroups });
+        }
       } catch {
         // Lookup failed — chat continues without cards
       }
@@ -318,6 +359,7 @@ export default function Chatbot() {
   const handleHouseholdSize = useCallback((size: HouseholdSize) => {
     appendAssistantText("Thanks! And which best describes how your household uses the internet?");
     setPlanFlow(f => ({ ...f, step: 'awaiting_usage', householdSize: size }));
+    logSelection({ householdSize: size });
   }, [appendAssistantText]);
 
   const handleUsage = useCallback((usage: UsageProfile) => {
@@ -335,7 +377,24 @@ export default function Chatbot() {
       recommendedPlan: plan,
       recommendationNote: metRecommendedSpeed ? undefined : 'This plan doesn’t fully meet the ideal speed for your household, but it’s the fastest one available at your address.',
     }));
+    logSelection({ usageProfile: usage });
   }, [planFlow, appendAssistantText]);
+
+  const handleSeeAllResources = useCallback(() => {
+    appendAssistantText(`Here are all the digital equity resources near you. ${closingLine}`);
+    setServiceFlow(f => ({ ...f, step: 'all_shown' }));
+  }, [appendAssistantText]);
+
+  const handleFilterByType = useCallback(() => {
+    appendAssistantText('Which type of resource are you looking for?');
+    setServiceFlow(f => ({ ...f, step: 'awaiting_type' }));
+  }, [appendAssistantText]);
+
+  const handleServiceType = useCallback((type: string) => {
+    appendAssistantText(`Here are the ${type.toLowerCase()} resources near you. ${closingLine}`);
+    setServiceFlow(f => ({ ...f, step: 'filtered_shown', selectedType: type }));
+    logSelection({ serviceType: type });
+  }, [appendAssistantText]);
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -372,7 +431,7 @@ export default function Chatbot() {
             const result = resultMap.get(resultKey);
 
             return (
-              <div key={m.id}>
+              <div key={m.id} ref={el => { if (el) messageRefs.current.set(m.id, el); else messageRefs.current.delete(m.id); }}>
                 <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-base leading-relaxed whitespace-pre-wrap ${
                     isUser
@@ -399,7 +458,7 @@ export default function Chatbot() {
                       <PlanCard planGroups={result.planGroups} address={result.address} mode="top" />
                     )}
                     {result.serviceGroups && result.intent !== 'plans' && (
-                      <ServiceCard serviceGroups={result.serviceGroups} />
+                      <ServiceCard services={getTopServices(result.serviceGroups)} />
                     )}
                   </div>
                 )}
@@ -410,7 +469,7 @@ export default function Chatbot() {
                 {!isUser && isLastMsg && !isStreaming && planFlow.step !== 'idle' && (
                   <div className="mt-1">
                     {planFlow.step === 'all_shown' && planFlow.planGroups && (
-                      <PlanCard planGroups={planFlow.planGroups} address={planFlow.address} mode="all" />
+                      <PlansTable plans={flattenPlans(planFlow.planGroups)} address={planFlow.address} />
                     )}
                     {planFlow.step === 'recommended_shown' && planFlow.recommendedPlan && (
                       <RecommendedPlanCard plan={planFlow.recommendedPlan} address={planFlow.address} note={planFlow.recommendationNote} />
@@ -418,8 +477,8 @@ export default function Chatbot() {
                     {planFlow.step === 'top_shown' && (
                       <ChoiceButtons
                         options={[
-                          { value: 'all', label: 'Show me all plans' },
-                          { value: 'recommend', label: 'Get a personalized recommendation' },
+                          { value: 'all', label: 'Show me all plans', icon: '📋' },
+                          { value: 'recommend', label: 'Get a personalized recommendation', icon: '🎯' },
                         ]}
                         onSelect={(v: 'all' | 'recommend') => (v === 'all' ? handleSeeAllPlans() : handleGetRecommendation())}
                       />
@@ -430,16 +489,43 @@ export default function Chatbot() {
                     {planFlow.step === 'awaiting_usage' && (
                       <ChoiceButtons options={USAGE_PROFILE_OPTIONS} onSelect={handleUsage} />
                     )}
-                    {(planFlow.step === 'all_shown' || planFlow.step === 'recommended_shown') && (
-                      <PromptSuggestions onSelect={sendMessage} />
+                  </div>
+                )}
+
+                {!isUser && isLastMsg && !isStreaming && serviceFlow.step !== 'idle' && (
+                  <div className="mt-1">
+                    {serviceFlow.step === 'top_shown' && (
+                      <ChoiceButtons
+                        options={[
+                          { value: 'all', label: 'Show me all resources', icon: '📋' },
+                          { value: 'filter', label: 'Filter by type', icon: '🔎' },
+                        ]}
+                        onSelect={(v: 'all' | 'filter') => (v === 'all' ? handleSeeAllResources() : handleFilterByType())}
+                      />
                     )}
+                    {serviceFlow.step === 'awaiting_type' && (
+                      <ChoiceButtons options={SERVICE_TYPES.map(t => ({ value: t, label: t }))} onSelect={handleServiceType} />
+                    )}
+                    {serviceFlow.step === 'all_shown' && serviceFlow.serviceGroups && (
+                      <ServicesTable serviceGroups={serviceFlow.serviceGroups} />
+                    )}
+                    {serviceFlow.step === 'filtered_shown' && serviceFlow.serviceGroups && (
+                      <ServicesTable serviceGroups={serviceFlow.serviceGroups} initialTypeFilter={serviceFlow.selectedType} />
+                    )}
+                  </div>
+                )}
+
+                {!isUser && isLastMsg && !isStreaming && (
+                  (planFlow.step === 'all_shown' || planFlow.step === 'recommended_shown' ||
+                   serviceFlow.step === 'all_shown' || serviceFlow.step === 'filtered_shown')
+                ) && (
+                  <div className="mt-1">
+                    <PromptSuggestions onSelect={sendMessage} />
                   </div>
                 )}
               </div>
             );
           })}
-
-          <div ref={bottomRef} />
         </div>
       </div>
 

@@ -21,17 +21,17 @@ export interface PlanGroups {
 export type HouseholdSize = '1' | '2-3' | '4-5' | '6+';
 export type UsageProfile = 'basic' | 'streaming' | 'heavy';
 
-export const HOUSEHOLD_SIZE_OPTIONS: Array<{ value: HouseholdSize; label: string }> = [
-  { value: '1', label: 'Just me (1 person)' },
-  { value: '2-3', label: 'Small household (2-3 people)' },
-  { value: '4-5', label: 'Family household (4-5 people)' },
-  { value: '6+', label: 'Large household (6+ people)' },
+export const HOUSEHOLD_SIZE_OPTIONS: Array<{ value: HouseholdSize; label: string; icon: string }> = [
+  { value: '1', label: 'Just me (1 person)', icon: '🧑' },
+  { value: '2-3', label: 'Small household (2-3 people)', icon: '👥' },
+  { value: '4-5', label: 'Family household (4-5 people)', icon: '👨‍👩‍👧‍👦' },
+  { value: '6+', label: 'Large household (6+ people)', icon: '🏠' },
 ];
 
-export const USAGE_PROFILE_OPTIONS: Array<{ value: UsageProfile; label: string }> = [
-  { value: 'basic', label: 'Basic — browsing, email, video calls' },
-  { value: 'streaming', label: 'Streaming & remote work' },
-  { value: 'heavy', label: 'Heavy use — gaming, smart home, many devices' },
+export const USAGE_PROFILE_OPTIONS: Array<{ value: UsageProfile; label: string; icon: string }> = [
+  { value: 'basic', label: 'Basic — browsing, email, video calls', icon: '📧' },
+  { value: 'streaming', label: 'Streaming & remote work', icon: '🎬' },
+  { value: 'heavy', label: 'Heavy use — gaming, smart home, many devices', icon: '🎮' },
 ];
 
 const USAGE_BASELINE_MBPS: Record<UsageProfile, { dl: number; ul: number }> = {
@@ -46,7 +46,7 @@ const HOUSEHOLD_MULTIPLIER: Record<HouseholdSize, number> = {
 
 // Price strings come out of the CSV as "$65.00 " — strip everything but
 // digits/dot/minus before parsing so currency formatting doesn't break this.
-const toNumber = (s: string): number | null => {
+export const toNumber = (s: string): number | null => {
   const n = parseFloat(String(s).replace(/[^0-9.-]/g, ''));
   return Number.isFinite(n) ? n : null;
 };

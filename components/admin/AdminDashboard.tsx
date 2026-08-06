@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
+import { HOUSEHOLD_SIZE_OPTIONS, USAGE_PROFILE_OPTIONS } from '@/lib/plan-utils';
 
 interface Analytics {
   totals: { total_messages: string; total_sessions: string; unique_addresses: string };
@@ -13,6 +14,9 @@ interface Analytics {
     intent: string; address_queried: string | null;
     num_plans_returned: number | null; num_services_returned: number | null;
   }>;
+  byHouseholdSize: Array<{ household_size: string; count: string }>;
+  byUsageProfile: Array<{ usage_profile: string; count: string }>;
+  byServiceType: Array<{ service_type_selected: string; count: string }>;
 }
 
 const INTENT_COLORS: Record<string, string> = {
@@ -60,6 +64,21 @@ export default function AdminDashboard() {
     day: r.day.slice(5, 10), // MM-DD from ISO string
     sessions: Number(r.sessions),
     messages: Number(r.messages),
+  }));
+
+  const householdSizeData = data.byHouseholdSize.map(r => ({
+    name: HOUSEHOLD_SIZE_OPTIONS.find(o => o.value === r.household_size)?.label ?? r.household_size,
+    value: Number(r.count),
+  }));
+
+  const usageProfileData = data.byUsageProfile.map(r => ({
+    name: USAGE_PROFILE_OPTIONS.find(o => o.value === r.usage_profile)?.label ?? r.usage_profile,
+    value: Number(r.count),
+  }));
+
+  const serviceTypeData = data.byServiceType.map(r => ({
+    name: r.service_type_selected,
+    value: Number(r.count),
   }));
 
   return (
@@ -111,6 +130,66 @@ export default function AdminDashboard() {
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={90} />
                   <Tooltip />
                   <Bar dataKey="value" name="Messages" fill="#3b82f6" radius={[0, 3, 3, 0]} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            )
+          }
+        </div>
+      </div>
+
+      {/* Guided-flow selections row */}
+      <div className="grid grid-cols-3 gap-4">
+        {/* Household size */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <p className="text-sm font-medium text-gray-700 mb-3">Household Size Selected</p>
+          {householdSizeData.length === 0
+            ? <p className="text-xs text-gray-400">No data yet</p>
+            : (
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={householdSizeData} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={110} />
+                  <Tooltip />
+                  <Bar dataKey="value" name="Sessions" fill="#3b82f6" radius={[0, 3, 3, 0]} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            )
+          }
+        </div>
+
+        {/* Usage profile */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <p className="text-sm font-medium text-gray-700 mb-3">Usage Profile Selected</p>
+          {usageProfileData.length === 0
+            ? <p className="text-xs text-gray-400">No data yet</p>
+            : (
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={usageProfileData} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={110} />
+                  <Tooltip />
+                  <Bar dataKey="value" name="Sessions" fill="#22c55e" radius={[0, 3, 3, 0]} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            )
+          }
+        </div>
+
+        {/* Service type filter */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <p className="text-sm font-medium text-gray-700 mb-3">Service Type Filtered</p>
+          {serviceTypeData.length === 0
+            ? <p className="text-xs text-gray-400">No data yet</p>
+            : (
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={serviceTypeData} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={110} />
+                  <Tooltip />
+                  <Bar dataKey="value" name="Sessions" fill="#f59e0b" radius={[0, 3, 3, 0]} isAnimationActive={false} />
                 </BarChart>
               </ResponsiveContainer>
             )

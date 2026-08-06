@@ -2,13 +2,31 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import CopyButton from './CopyButton';
+import DownloadCsvButton from './DownloadCsvButton';
 import { flattenPlans, getCheapestPlan, getFastestPlan, type Plan, type PlanGroups } from '@/lib/plan-utils';
 
 // CSV price strings already include a leading "$" (e.g. "$65.00 ") — strip
 // it before re-adding our own to avoid rendering "$$65.00".
-const formatPrice = (price: string): string => `$${price.trim().replace(/^\$/, '')}`;
+export const formatPrice = (price: string): string => `$${price.trim().replace(/^\$/, '')}`;
 
-const formatPlanSms = (plan: Plan, address?: string): string => {
+const PLAN_CSV_HEADER = ['Plan', 'Provider', 'Technology', 'Price/mo', 'Download Mbps', 'Upload Mbps', 'Low-Income Discount', 'Contract', 'Meets 100/25 Mbps'];
+
+export const planCsvRows = (plans: Plan[]): Array<Array<string | number>> => [
+  PLAN_CSV_HEADER,
+  ...plans.map(p => [
+    p.planName || p.provider,
+    p.provider,
+    p.technology,
+    formatPrice(p.price),
+    p.downloadMbps,
+    p.uploadMbps,
+    p.lowIncome === 'Y' ? `$${p.liDiscount}` : '',
+    p.contract === 'Y' ? `${p.contractMonths} months` : 'No contract',
+    p.meetsThreshold ? 'Yes' : 'No',
+  ]),
+];
+
+export const formatPlanSms = (plan: Plan, address?: string): string => {
   const lines = [
     address ? `INTERNET AT ${address.toUpperCase()}` : 'INTERNET PLAN',
     '━━━━━━━━━━━━━━━━━━━━',
@@ -92,12 +110,16 @@ export default function PlanCard({ planGroups, address, mode = 'all' }: Props) {
     const cheapest = getCheapestPlan(all);
     const fastest = getFastestPlan(all);
     const same = !!cheapest && !!fastest && cheapest === fastest;
+    const shown = same ? [cheapest!] : [cheapest, fastest].filter((p): p is Plan => !!p);
 
     return (
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden mt-3">
-        <div className="px-4 py-3 bg-blue-50 border-b border-blue-100">
-          <p className="text-base font-semibold text-blue-800">Internet Plans Available</p>
-          {address && <p className="text-sm text-blue-600 mt-0.5">{address}</p>}
+        <div className="px-4 py-3 bg-blue-50 border-b border-blue-100 flex items-start justify-between gap-2">
+          <div>
+            <p className="text-base font-semibold text-blue-800">Internet Plans Available</p>
+            {address && <p className="text-sm text-blue-600 mt-0.5">{address}</p>}
+          </div>
+          {shown.length > 0 && <DownloadCsvButton filename="internet-plans.csv" rows={planCsvRows(shown)} className="shrink-0 mt-0.5" />}
         </div>
 
         {cheapest && (

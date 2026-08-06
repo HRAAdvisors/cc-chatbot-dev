@@ -42,3 +42,17 @@ export const nationalServicesOnly = (): ServiceGroups => ({
   within1: [], within5: [], within10: [],
   national: SERVICES.filter(s => s.lat === null) as ServiceWithDistance[],
 });
+
+// within1/5/10 are already distance-sorted ascending; national has no
+// meaningful distance so it's the fallback once the nearer tiers run out.
+export const getTopServices = (groups: ServiceGroups, n = 3): ServiceWithDistance[] =>
+  [...groups.within1, ...groups.within5, ...groups.within10, ...groups.national].slice(0, n);
+
+export type ServiceTier = 'within1' | 'within5' | 'within10' | 'national';
+
+export const flattenServiceGroups = (groups: ServiceGroups): Array<ServiceWithDistance & { tier: ServiceTier }> => [
+  ...groups.within1.map(s => ({ ...s, tier: 'within1' as const })),
+  ...groups.within5.map(s => ({ ...s, tier: 'within5' as const })),
+  ...groups.within10.map(s => ({ ...s, tier: 'within10' as const })),
+  ...groups.national.map(s => ({ ...s, tier: 'national' as const })),
+];

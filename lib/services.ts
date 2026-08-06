@@ -111,3 +111,9 @@ export const SERVICES = [
   { name: 'DigitalLearn.org (Public Library Association)', type: 'Digital Skills Training', phone: null, url: 'https://digitallearn.org/', address: 'Online / National', lat: null, long: null, description: 'Free self-paced online courses covering basic computer skills, internet use, email, social media safety, and job searching — designed for adult learners. Often used by libraries as a training platform.', languages: 'English' },
   { name: 'Digitunity', type: 'Device Access Resources', phone: null, url: 'https://www.digitunity.org/', address: 'Online / National', lat: null, long: null, description: 'National nonprofit that connects individuals and organizations to refurbished device programs, digital navigators, and digital inclusion resources nationwide. Maintains a directory of device programs available by zip code.', languages: 'English' },
 ];
+
+// Some records carry a comma-joined multi-type string (e.g. "Digital Skills
+// Training, Device Access Resources") — split those out before deduping.
+export const SERVICE_TYPES: string[] = Array.from(
+  new Set(SERVICES.flatMap(s => s.type.split(',').map(t => t.trim())))
+).sort();
