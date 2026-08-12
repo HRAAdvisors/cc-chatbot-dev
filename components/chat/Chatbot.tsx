@@ -408,10 +408,9 @@ export default function Chatbot() {
     <div className="flex flex-col h-screen bg-slate-50">
       {/* Header */}
       <header className="bg-blue-700 px-4 py-4 shrink-0 shadow-sm">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-white/15 ring-1 ring-white/30 flex items-center justify-center text-white text-base font-bold">CC</div>
+        <div className="max-w-2xl mx-auto flex gap-3">
           <div>
-            <p className="text-base font-semibold text-white">Clark County Digital Equity Assistant</p>
+            <p className="text-base font-bold text-white">Clark County Digital Equity Assistant</p>
             <p className="text-sm text-blue-100">Internet plans & digital resources in Clark County, NV</p>
           </div>
         </div>
@@ -459,6 +458,23 @@ export default function Chatbot() {
                     )}
                     {result.serviceGroups && result.intent !== 'plans' && (
                       <ServiceCard services={getTopServices(result.serviceGroups)} />
+                    )}
+                  </div>
+                )}
+
+                {/* Follow-ups that don't repeat the address or name a topic (e.g. "what's
+                    the cheapest option?") skip the lookup above entirely, since there's
+                    nothing new to fetch — but the cards should still be there for the user
+                    to reference. Only applies once the guided flow has released the bottom
+                    slot (it renders its own cards below), and only to the reply actually
+                    being read, not to every past message that lacked its own lookup. */}
+                {!isUser && !result && isLastMsg && !isStreaming && lastLookup && planFlow.step === 'idle' && serviceFlow.step === 'idle' && (
+                  <div className="mt-1">
+                    {lastLookup.planGroups && activeIntent !== 'services' && (
+                      <PlanCard planGroups={lastLookup.planGroups} address={lastLookup.address} mode="top" />
+                    )}
+                    {lastLookup.serviceGroups && activeIntent !== 'plans' && (
+                      <ServiceCard services={getTopServices(lastLookup.serviceGroups)} />
                     )}
                   </div>
                 )}

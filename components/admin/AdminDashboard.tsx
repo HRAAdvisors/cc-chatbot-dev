@@ -122,8 +122,8 @@ export default function AdminDashboard() {
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-gray-900">Analytics Dashboard</h1>
-        <p className="text-xs text-gray-500 mt-0.5">Clark County Digital Equity Chatbot</p>
+        <h1 className="text-lg font-bold text-gray-900">Analytics Dashboard</h1>
+        <p className="text-xs text-gray-500 mt-0.5">Clark County Digital Navigator Assistant</p>
       </div>
 
       {/* Totals */}

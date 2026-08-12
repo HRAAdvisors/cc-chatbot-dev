@@ -6,10 +6,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <aside className="w-52 shrink-0 bg-white border-r border-gray-200 flex flex-col">
         <div className="px-4 py-4 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">CC</div>
             <div>
-              <p className="text-xs font-semibold text-gray-900">Admin</p>
-              <p className="text-xs text-gray-400">Digital Equity</p>
+              <p className="text-xs font-semibold text-gray-900">Admin View</p>
             </div>
           </div>
         </div>

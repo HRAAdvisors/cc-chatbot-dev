@@ -30,7 +30,6 @@ export default function AdminLogin() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 w-full max-w-sm">
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold">CC</div>
           <div>
             <p className="text-sm font-semibold text-gray-900">Admin Dashboard</p>
             <p className="text-xs text-gray-500">Clark County Digital Equity</p>

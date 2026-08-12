@@ -8,7 +8,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Clark County Digital Equity Assistant",
+  title: "Clark County Digital Navigator Assistant",
   description: "Find internet plans and digital equity resources in Clark County, NV",
 };
 
