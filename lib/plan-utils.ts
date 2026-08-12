@@ -20,6 +20,7 @@ export interface PlanGroups {
 
 export type HouseholdSize = '1' | '2-3' | '4-5' | '6+';
 export type UsageProfile = 'basic' | 'streaming' | 'heavy';
+export type DeviceCount = '1-2' | '2-3' | '3-5' | '5-10' | '10-15' | '15-30' | '30+';
 
 export const HOUSEHOLD_SIZE_OPTIONS: Array<{ value: HouseholdSize; label: string; icon: string }> = [
   { value: '1', label: 'Just me (1 person)', icon: '🧑' },
@@ -34,6 +35,18 @@ export const USAGE_PROFILE_OPTIONS: Array<{ value: UsageProfile; label: string; 
   { value: 'heavy', label: 'Heavy use — gaming, smart home, many devices', icon: '🎮' },
 ];
 
+// Device counts include phones, laptops, smart TVs, consoles, and any other
+// gadget that's online at the same time — not just computers.
+export const DEVICE_COUNT_OPTIONS: Array<{ value: DeviceCount; label: string; icon: string }> = [
+  { value: '1-2', label: '1-2 devices — browsing, email, music', icon: '📱' },
+  { value: '2-3', label: '2-3 devices — on-demand video streaming', icon: '💻' },
+  { value: '3-5', label: '3-5 devices — HD streaming, video calls', icon: '📺' },
+  { value: '5-10', label: '5-10 devices — multi-device HD & gaming', icon: '🎮' },
+  { value: '10-15', label: '10-15 devices — competitive gaming, livestreaming', icon: '🕹️' },
+  { value: '15-30', label: '15-30 devices — gaming across many devices', icon: '🏠' },
+  { value: '30+', label: '30+ devices — business or enterprise use', icon: '🏢' },
+];
+
 const USAGE_BASELINE_MBPS: Record<UsageProfile, { dl: number; ul: number }> = {
   basic: { dl: 25, ul: 5 },
   streaming: { dl: 100, ul: 10 },
@@ -42,6 +55,20 @@ const USAGE_BASELINE_MBPS: Record<UsageProfile, { dl: number; ul: number }> = {
 
 const HOUSEHOLD_MULTIPLIER: Record<HouseholdSize, number> = {
   '1': 1, '2-3': 1.3, '4-5': 1.6, '6+': 2,
+};
+
+// Minimum recommended download speed per number of simultaneously connected
+// devices, per the broadband speed guidance table (10 Mbps for 1-2 devices up
+// to 2 Gbps for 30+). This is a floor: recommendPlan() also considers
+// household size and usage, and never recommends below whichever is higher.
+const DEVICE_COUNT_MIN_MBPS: Record<DeviceCount, number> = {
+  '1-2': 10,
+  '2-3': 25,
+  '3-5': 100,
+  '5-10': 200,
+  '10-15': 500,
+  '15-30': 1000,
+  '30+': 2000,
 };
 
 // Price strings come out of the CSV as "$65.00 " — strip everything but
@@ -78,10 +105,10 @@ export interface PlanRecommendation {
   metRecommendedSpeed: boolean;
 }
 
-export const recommendPlan = (plans: Plan[], householdSize: HouseholdSize, usage: UsageProfile): PlanRecommendation => {
+export const recommendPlan = (plans: Plan[], householdSize: HouseholdSize, usage: UsageProfile, deviceCount: DeviceCount): PlanRecommendation => {
   const baseline = USAGE_BASELINE_MBPS[usage];
   const mult = HOUSEHOLD_MULTIPLIER[householdSize];
-  const requiredDl = baseline.dl * mult;
+  const requiredDl = Math.max(baseline.dl * mult, DEVICE_COUNT_MIN_MBPS[deviceCount]);
   const requiredUl = baseline.ul * mult;
 
   const qualifying = plans.filter(p =>

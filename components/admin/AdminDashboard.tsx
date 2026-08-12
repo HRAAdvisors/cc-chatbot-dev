@@ -5,7 +5,7 @@ import { Download } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { HOUSEHOLD_SIZE_OPTIONS, USAGE_PROFILE_OPTIONS } from '@/lib/plan-utils';
+import { HOUSEHOLD_SIZE_OPTIONS, USAGE_PROFILE_OPTIONS, DEVICE_COUNT_OPTIONS } from '@/lib/plan-utils';
 import type { AddressPoint } from './AddressMap';
 
 const AddressMap = dynamic(() => import('./AddressMap'), { ssr: false });
@@ -22,11 +22,13 @@ interface Analytics {
   recentSessions: Array<{
     session_id: string; started_at: string; ended_at: string; message_count: string;
     intents: string; address_queried: string | null;
-    household_size: string | null; usage_profile: string | null; service_type_selected: string | null;
+    household_size: string | null; usage_profile: string | null; device_count: string | null;
+    service_type_selected: string | null;
     num_plans_returned: number | null; num_services_returned: number | null;
   }>;
   byHouseholdSize: Array<{ household_size: string; count: string }>;
   byUsageProfile: Array<{ usage_profile: string; count: string }>;
+  byDeviceCount: Array<{ device_count: string; count: string }>;
   byServiceType: Array<{ service_type_selected: string; count: string }>;
   byZipIntent: Array<{ zip: string; intent: string; count: string }>;
   addressPoints: AddressPoint[];
@@ -113,6 +115,11 @@ export default function AdminDashboard() {
 
   const usageProfileData = data.byUsageProfile.map(r => ({
     name: USAGE_PROFILE_OPTIONS.find(o => o.value === r.usage_profile)?.label ?? r.usage_profile,
+    value: Number(r.count),
+  }));
+
+  const deviceCountData = data.byDeviceCount.map(r => ({
+    name: DEVICE_COUNT_OPTIONS.find(o => o.value === r.device_count)?.label ?? r.device_count,
     value: Number(r.count),
   }));
 
@@ -245,8 +252,8 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Guided-flow selections row */}
-      <div className="grid grid-cols-3 gap-4">
+      {/* Guided-flow selections */}
+      <div className="grid grid-cols-2 gap-4">
         {/* Household size */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <p className="text-sm font-medium text-gray-700 mb-3">Household Size Selected</p>
@@ -260,6 +267,25 @@ export default function AdminDashboard() {
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={110} />
                   <Tooltip />
                   <Bar dataKey="value" name="Sessions" fill="#3b82f6" radius={[0, 3, 3, 0]} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            )
+          }
+        </div>
+
+        {/* Device count */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <p className="text-sm font-medium text-gray-700 mb-3">Number of Devices Selected</p>
+          {deviceCountData.length === 0
+            ? <p className="text-xs text-gray-400">No data yet</p>
+            : (
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={deviceCountData} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={110} />
+                  <Tooltip />
+                  <Bar dataKey="value" name="Sessions" fill="#8b5cf6" radius={[0, 3, 3, 0]} isAnimationActive={false} />
                 </BarChart>
               </ResponsiveContainer>
             )
@@ -416,6 +442,7 @@ export default function AdminDashboard() {
                   <th className="text-left px-4 py-2 text-gray-500 font-medium">Intents</th>
                   <th className="text-left px-4 py-2 text-gray-500 font-medium">Address</th>
                   <th className="text-left px-4 py-2 text-gray-500 font-medium">Household</th>
+                  <th className="text-left px-4 py-2 text-gray-500 font-medium">Devices</th>
                   <th className="text-left px-4 py-2 text-gray-500 font-medium">Usage</th>
                   <th className="text-left px-4 py-2 text-gray-500 font-medium">Plans</th>
                   <th className="px-4 py-2 w-8" />
@@ -434,6 +461,9 @@ export default function AdminDashboard() {
                     <td className="px-4 py-2 text-gray-600 max-w-[150px] truncate">{row.address_queried || '—'}</td>
                     <td className="px-4 py-2 text-gray-500">
                       {HOUSEHOLD_SIZE_OPTIONS.find(o => o.value === row.household_size)?.label ?? row.household_size ?? '—'}
+                    </td>
+                    <td className="px-4 py-2 text-gray-500">
+                      {DEVICE_COUNT_OPTIONS.find(o => o.value === row.device_count)?.label ?? row.device_count ?? '—'}
                     </td>
                     <td className="px-4 py-2 text-gray-500">
                       {USAGE_PROFILE_OPTIONS.find(o => o.value === row.usage_profile)?.label ?? row.usage_profile ?? '—'}

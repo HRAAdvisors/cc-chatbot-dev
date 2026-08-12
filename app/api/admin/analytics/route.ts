@@ -1,7 +1,7 @@
 import {
   getEnrichedChatLogs, parseFilters, applyFilters, buildSessionRollups,
   computeTotals, groupByIntent, groupByDay, groupByHouseholdSize, groupByUsageProfile,
-  groupByServiceType, groupByZipIntent, recentMessages, addressPoints,
+  groupByDeviceCount, groupByServiceType, groupByZipIntent, recentMessages, addressPoints,
 } from '@/lib/dashboard-data';
 import { DISTRICT_OPTIONS } from '@/lib/districts';
 
@@ -17,6 +17,7 @@ export async function GET(req: Request) {
     recentSessions: buildSessionRollups(rows, 50),
     byHouseholdSize: groupByHouseholdSize(rows),
     byUsageProfile: groupByUsageProfile(rows),
+    byDeviceCount: groupByDeviceCount(rows),
     byServiceType: groupByServiceType(rows),
     byZipIntent: groupByZipIntent(rows),
     addressPoints: addressPoints(rows),

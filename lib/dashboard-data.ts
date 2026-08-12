@@ -1,5 +1,6 @@
 import sql from './db';
 import { districtForPoint } from './districts';
+import { DEVICE_COUNT_OPTIONS } from './plan-utils';
 
 export interface ChatLogRow {
   id: number;
@@ -14,6 +15,7 @@ export interface ChatLogRow {
   num_services_returned: number | null;
   household_size: string | null;
   usage_profile: string | null;
+  device_count: string | null;
   service_type_selected: string | null;
   district: string | null;
 }
@@ -31,7 +33,7 @@ export async function getEnrichedChatLogs(): Promise<ChatLogRow[]> {
       COALESCE(c.lat, p.lat) AS lat,
       COALESCE(c.long, p.long) AS long,
       c.num_plans_returned, c.num_services_returned,
-      c.household_size, c.usage_profile, c.service_type_selected
+      c.household_size, c.usage_profile, c.device_count, c.service_type_selected
     FROM chat_logs c
     LEFT JOIN LATERAL (
       SELECT lat, long FROM points
@@ -96,7 +98,7 @@ function maxOrNull(group: ChatLogRow[], field: 'num_plans_returned' | 'num_servi
   return max;
 }
 
-function mostRecentNonNull(sortedDesc: ChatLogRow[], field: 'address_queried' | 'household_size' | 'usage_profile' | 'service_type_selected'): string | null {
+function mostRecentNonNull(sortedDesc: ChatLogRow[], field: 'address_queried' | 'household_size' | 'usage_profile' | 'device_count' | 'service_type_selected'): string | null {
   const hit = sortedDesc.find(r => r[field] != null);
   return hit ? (hit[field] as string) : null;
 }
@@ -110,6 +112,7 @@ export interface SessionRollup {
   address_queried: string | null;
   household_size: string | null;
   usage_profile: string | null;
+  device_count: string | null;
   service_type_selected: string | null;
   num_plans_returned: number | null;
   num_services_returned: number | null;
@@ -141,6 +144,7 @@ export function buildSessionRollups(rows: ChatLogRow[], limit?: number): Session
       address_queried: mostRecentNonNull(sortedDesc, 'address_queried'),
       household_size: mostRecentNonNull(sortedDesc, 'household_size'),
       usage_profile: mostRecentNonNull(sortedDesc, 'usage_profile'),
+      device_count: mostRecentNonNull(sortedDesc, 'device_count'),
       service_type_selected: mostRecentNonNull(sortedDesc, 'service_type_selected'),
       num_plans_returned: maxOrNull(group, 'num_plans_returned'),
       num_services_returned: maxOrNull(group, 'num_services_returned'),
@@ -200,6 +204,21 @@ export const groupByHouseholdSize = (rows: ChatLogRow[]) =>
 
 export const groupByUsageProfile = (rows: ChatLogRow[]) =>
   groupBySelectionField(rows, 'usage_profile') as Array<{ usage_profile: string; count: string }>;
+
+// Sorted by the guidance table's device-count order (1-2, 2-3, 3-5, ...), not
+// alphabetically — alphabetical would put "10-15" before "2-3".
+const DEVICE_COUNT_ORDER: string[] = DEVICE_COUNT_OPTIONS.map(o => o.value);
+
+export function groupByDeviceCount(rows: ChatLogRow[]) {
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    if (r.device_count == null) continue;
+    counts.set(r.device_count, (counts.get(r.device_count) ?? 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .sort((a, b) => DEVICE_COUNT_ORDER.indexOf(a[0]) - DEVICE_COUNT_ORDER.indexOf(b[0]))
+    .map(([device_count, count]) => ({ device_count, count: String(count) }));
+}
 
 export function groupByServiceType(rows: ChatLogRow[]) {
   const counts = new Map<string, number>();

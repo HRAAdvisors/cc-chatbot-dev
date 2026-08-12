@@ -8,7 +8,7 @@ For a full breakdown of how the pieces fit together (routes, data stores, extern
 
 1. A resident types their address and a question into the chatbot ([components/chat/Chatbot.tsx](components/chat/Chatbot.tsx)).
 2. The app geocodes the address (OpenStreetMap Nominatim), checks broadband availability (Neon Postgres `points` table), matches ISP plans from a bundled CSV, and finds nearby digital-equity resources — all via `POST /api/lookup`.
-3. That result is folded into a context block sent to Claude (`claude-sonnet-4-6`, via `POST /api/chat`), which streams back a conversational answer alongside plan/service cards (and a guided household-size/usage-based recommendation flow). The resident can download any result set as a CSV directly from the card.
+3. That result is folded into a context block sent to Claude (`claude-sonnet-4-6`, via `POST /api/chat`), which streams back a conversational answer alongside plan/service cards (and a guided household-size / device-count / usage-profile recommendation flow, with the device-count guidance table setting a speed floor). The resident can download any result set as a CSV directly from the card.
 4. Every exchange is logged to Postgres (`chat_logs`) for the `/admin` analytics dashboard — password-protected, filterable by **intent**, **commissioner district** (point-in-polygon against a bundled GeoJSON of Clark County's 7 districts), and **date range** (all filters apply to every chart, the map, and the table at once), with a toggle between per-message and per-session views, bulk or per-row CSV export, a ZIP-code-by-intent chart, and a Mapbox map of geocoded address searches.
 
 ## Tech stack

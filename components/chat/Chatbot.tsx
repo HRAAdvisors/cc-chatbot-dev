@@ -13,10 +13,12 @@ import {
   recommendPlan,
   HOUSEHOLD_SIZE_OPTIONS,
   USAGE_PROFILE_OPTIONS,
+  DEVICE_COUNT_OPTIONS,
   type PlanGroups,
   type Plan,
   type HouseholdSize,
   type UsageProfile,
+  type DeviceCount,
 } from '@/lib/plan-utils';
 import { getTopServices, type ServiceGroups, type ServiceWithDistance } from '@/lib/services-lookup';
 import { SERVICE_TYPES } from '@/lib/services';
@@ -40,9 +42,9 @@ interface LookupResult {
 
 type ResultMap = Map<string, LookupResult>;
 
-// Steps 5-8 of the internet-offer flow: show the headline plans first, then
-// branch into "see everything" or a guided household-size/usage recommendation.
-type PlanFlowStep = 'idle' | 'top_shown' | 'awaiting_household' | 'awaiting_usage' | 'all_shown' | 'recommended_shown';
+// Steps 5-9 of the internet-offer flow: show the headline plans first, then
+// branch into "see everything" or a guided household-size/devices/usage recommendation.
+type PlanFlowStep = 'idle' | 'top_shown' | 'awaiting_household' | 'awaiting_devices' | 'awaiting_usage' | 'all_shown' | 'recommended_shown';
 
 interface PlanFlowState {
   step: PlanFlowStep;
@@ -50,6 +52,7 @@ interface PlanFlowState {
   planGroups?: PlanGroups;
   address?: string;
   householdSize?: HouseholdSize;
+  deviceCount?: DeviceCount;
   recommendedPlan?: Plan | null;
   recommendationNote?: string;
 }
@@ -166,7 +169,7 @@ const sessionId = nanoid();
 // Fire-and-forget: these selections happen entirely client-side (no /api/chat
 // call necessarily follows), so they're posted to their own endpoint rather
 // than piggybacked on the next chat turn, which may never come.
-function logSelection(fields: { householdSize?: string; usageProfile?: string; serviceType?: string }) {
+function logSelection(fields: { householdSize?: string; usageProfile?: string; deviceCount?: string; serviceType?: string }) {
   fetch('/api/log-selection', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -357,17 +360,23 @@ export default function Chatbot() {
   }, [appendAssistantText]);
 
   const handleHouseholdSize = useCallback((size: HouseholdSize) => {
-    appendAssistantText("Thanks! And which best describes how your household uses the internet?");
-    setPlanFlow(f => ({ ...f, step: 'awaiting_usage', householdSize: size }));
+    appendAssistantText("Thanks! About how many devices are usually connected at once — phones, laptops, smart TVs, consoles, and so on?");
+    setPlanFlow(f => ({ ...f, step: 'awaiting_devices', householdSize: size }));
     logSelection({ householdSize: size });
   }, [appendAssistantText]);
 
+  const handleDeviceCount = useCallback((count: DeviceCount) => {
+    appendAssistantText("Got it. And which best describes how your household uses the internet?");
+    setPlanFlow(f => ({ ...f, step: 'awaiting_usage', deviceCount: count }));
+    logSelection({ deviceCount: count });
+  }, [appendAssistantText]);
+
   const handleUsage = useCallback((usage: UsageProfile) => {
-    if (!planFlow.planGroups || !planFlow.householdSize) return;
-    const { plan, metRecommendedSpeed } = recommendPlan(flattenPlans(planFlow.planGroups), planFlow.householdSize, usage);
+    if (!planFlow.planGroups || !planFlow.householdSize || !planFlow.deviceCount) return;
+    const { plan, metRecommendedSpeed } = recommendPlan(flattenPlans(planFlow.planGroups), planFlow.householdSize, usage, planFlow.deviceCount);
     const intro = plan
       ? metRecommendedSpeed
-        ? "Based on your household size and internet use, here's our recommended plan."
+        ? "Based on your household size, device count, and internet use, here's our recommended plan."
         : "None of the available plans fully meet the ideal speed for your household, but here's the fastest option available."
       : "We couldn't find a matching plan for your address.";
     appendAssistantText(`${intro} ${closingLine}`);
@@ -501,6 +510,9 @@ export default function Chatbot() {
                     )}
                     {planFlow.step === 'awaiting_household' && (
                       <ChoiceButtons options={HOUSEHOLD_SIZE_OPTIONS} onSelect={handleHouseholdSize} />
+                    )}
+                    {planFlow.step === 'awaiting_devices' && (
+                      <ChoiceButtons options={DEVICE_COUNT_OPTIONS} onSelect={handleDeviceCount} />
                     )}
                     {planFlow.step === 'awaiting_usage' && (
                       <ChoiceButtons options={USAGE_PROFILE_OPTIONS} onSelect={handleUsage} />

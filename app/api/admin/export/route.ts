@@ -14,7 +14,7 @@ function csvResponse<T extends object>(rows: T[], filename: string) {
 
 const MESSAGE_FIELDS = [
   'id', 'session_id', 'created_at', 'user_message', 'intent', 'address_queried',
-  'num_plans_returned', 'num_services_returned', 'household_size', 'usage_profile', 'service_type_selected',
+  'num_plans_returned', 'num_services_returned', 'household_size', 'usage_profile', 'device_count', 'service_type_selected',
 ] as const;
 
 export async function GET(req: Request) {
@@ -41,7 +41,7 @@ export async function GET(req: Request) {
   if (type === 'session' && id) {
     const rows = await sql`
       SELECT id, session_id, created_at, user_message, intent, address_queried,
-        num_plans_returned, num_services_returned, household_size, usage_profile, service_type_selected
+        num_plans_returned, num_services_returned, household_size, usage_profile, device_count, service_type_selected
       FROM chat_logs
       WHERE session_id = ${id}
       ORDER BY created_at
@@ -52,7 +52,7 @@ export async function GET(req: Request) {
   if (type === 'message' && id && /^\d+$/.test(id)) {
     const rows = await sql`
       SELECT id, session_id, created_at, user_message, intent, address_queried,
-        num_plans_returned, num_services_returned, household_size, usage_profile, service_type_selected
+        num_plans_returned, num_services_returned, household_size, usage_profile, device_count, service_type_selected
       FROM chat_logs
       WHERE id = ${Number(id)}
     `;

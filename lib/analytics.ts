@@ -29,19 +29,22 @@ export async function logChat(entry: ChatLogEntry): Promise<void> {
 export interface SelectionFields {
   householdSize?: string;
   usageProfile?: string;
+  deviceCount?: string;
   serviceTypeSelected?: string;
 }
 
-// Household size / usage profile / service type are chosen via ChoiceButtons
-// clicks that don't necessarily lead to another /api/chat call, so there's no
-// natural INSERT to attach them to — instead, update the most recent chat_logs
-// row for the session (the lookup turn that triggered the guided flow).
+// Household size / usage profile / device count / service type are chosen via
+// ChoiceButtons clicks that don't necessarily lead to another /api/chat call,
+// so there's no natural INSERT to attach them to — instead, update the most
+// recent chat_logs row for the session (the lookup turn that triggered the
+// guided flow).
 export async function logSelection(sessionId: string, fields: SelectionFields): Promise<void> {
   try {
     await sql`
       UPDATE chat_logs SET
         household_size = COALESCE(${fields.householdSize ?? null}, household_size),
         usage_profile = COALESCE(${fields.usageProfile ?? null}, usage_profile),
+        device_count = COALESCE(${fields.deviceCount ?? null}, device_count),
         service_type_selected = COALESCE(${fields.serviceTypeSelected ?? null}, service_type_selected)
       WHERE id = (SELECT id FROM chat_logs WHERE session_id = ${sessionId} ORDER BY created_at DESC LIMIT 1)
     `;
