@@ -14,6 +14,12 @@ interface Analytics {
     intent: string; address_queried: string | null;
     num_plans_returned: number | null; num_services_returned: number | null;
   }>;
+  recentSessions: Array<{
+    session_id: string; started_at: string; ended_at: string; message_count: string;
+    intents: string; address_queried: string | null;
+    household_size: string | null; usage_profile: string | null; service_type_selected: string | null;
+    num_plans_returned: number | null; num_services_returned: number | null;
+  }>;
   byHouseholdSize: Array<{ household_size: string; count: string }>;
   byUsageProfile: Array<{ usage_profile: string; count: string }>;
   byServiceType: Array<{ service_type_selected: string; count: string }>;
@@ -43,6 +49,7 @@ function MetricCard({ label, value }: { label: string; value: string | number })
 export default function AdminDashboard() {
   const [data, setData] = useState<Analytics | null>(null);
   const [error, setError] = useState('');
+  const [view, setView] = useState<'messages' | 'sessions'>('messages');
 
   useEffect(() => {
     fetch('/api/admin/analytics')
@@ -199,42 +206,103 @@ export default function AdminDashboard() {
 
       {/* Recent conversations */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100">
-          <p className="text-sm font-medium text-gray-700">Recent Messages</p>
+        <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+            <button
+              onClick={() => setView('messages')}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                view === 'messages' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Messages
+            </button>
+            <button
+              onClick={() => setView('sessions')}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                view === 'sessions' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Sessions
+            </button>
+          </div>
+          <a
+            href={`/api/admin/export?type=${view}`}
+            download
+            className="text-xs font-medium text-blue-600 hover:text-blue-700"
+          >
+            Download CSV
+          </a>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left px-4 py-2 text-gray-500 font-medium">Time</th>
-                <th className="text-left px-4 py-2 text-gray-500 font-medium">Message</th>
-                <th className="text-left px-4 py-2 text-gray-500 font-medium">Intent</th>
-                <th className="text-left px-4 py-2 text-gray-500 font-medium">Address</th>
-                <th className="text-left px-4 py-2 text-gray-500 font-medium">Plans</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.recent.map((row, i) => (
-                <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
-                  <td className="px-4 py-2 text-gray-400 whitespace-nowrap">
-                    {new Date(row.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                  </td>
-                  <td className="px-4 py-2 text-gray-700 max-w-[200px] truncate">{row.user_message || '—'}</td>
-                  <td className="px-4 py-2">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs ${
-                      row.intent === 'internet_offer' ? 'bg-blue-100 text-blue-700'
-                      : row.intent === 'digital_equity' ? 'bg-green-100 text-green-700'
-                      : 'bg-gray-100 text-gray-500'
-                    }`}>
-                      {INTENT_LABELS[row.intent] ?? row.intent}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 text-gray-600 max-w-[150px] truncate">{row.address_queried || '—'}</td>
-                  <td className="px-4 py-2 text-gray-500">{row.num_plans_returned ?? '—'}</td>
+          {view === 'messages' ? (
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  <th className="text-left px-4 py-2 text-gray-500 font-medium">Time</th>
+                  <th className="text-left px-4 py-2 text-gray-500 font-medium">Message</th>
+                  <th className="text-left px-4 py-2 text-gray-500 font-medium">Intent</th>
+                  <th className="text-left px-4 py-2 text-gray-500 font-medium">Address</th>
+                  <th className="text-left px-4 py-2 text-gray-500 font-medium">Plans</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {data.recent.map((row, i) => (
+                  <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="px-4 py-2 text-gray-400 whitespace-nowrap">
+                      {new Date(row.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                    <td className="px-4 py-2 text-gray-700 max-w-[200px] truncate">{row.user_message || '—'}</td>
+                    <td className="px-4 py-2">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs ${
+                        row.intent === 'internet_offer' ? 'bg-blue-100 text-blue-700'
+                        : row.intent === 'digital_equity' ? 'bg-green-100 text-green-700'
+                        : 'bg-gray-100 text-gray-500'
+                      }`}>
+                        {INTENT_LABELS[row.intent] ?? row.intent}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-gray-600 max-w-[150px] truncate">{row.address_queried || '—'}</td>
+                    <td className="px-4 py-2 text-gray-500">{row.num_plans_returned ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  <th className="text-left px-4 py-2 text-gray-500 font-medium">Started</th>
+                  <th className="text-left px-4 py-2 text-gray-500 font-medium">Messages</th>
+                  <th className="text-left px-4 py-2 text-gray-500 font-medium">Intents</th>
+                  <th className="text-left px-4 py-2 text-gray-500 font-medium">Address</th>
+                  <th className="text-left px-4 py-2 text-gray-500 font-medium">Household</th>
+                  <th className="text-left px-4 py-2 text-gray-500 font-medium">Usage</th>
+                  <th className="text-left px-4 py-2 text-gray-500 font-medium">Plans</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.recentSessions.map((row) => (
+                  <tr key={row.session_id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="px-4 py-2 text-gray-400 whitespace-nowrap">
+                      {new Date(row.started_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                    <td className="px-4 py-2 text-gray-500">{row.message_count}</td>
+                    <td className="px-4 py-2 text-gray-600 max-w-[160px] truncate">
+                      {row.intents.split(', ').map(i => INTENT_LABELS[i] ?? i).join(', ')}
+                    </td>
+                    <td className="px-4 py-2 text-gray-600 max-w-[150px] truncate">{row.address_queried || '—'}</td>
+                    <td className="px-4 py-2 text-gray-500">
+                      {HOUSEHOLD_SIZE_OPTIONS.find(o => o.value === row.household_size)?.label ?? row.household_size ?? '—'}
+                    </td>
+                    <td className="px-4 py-2 text-gray-500">
+                      {USAGE_PROFILE_OPTIONS.find(o => o.value === row.usage_profile)?.label ?? row.usage_profile ?? '—'}
+                    </td>
+                    <td className="px-4 py-2 text-gray-500">{row.num_plans_returned ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>

@@ -1,12 +1,10 @@
 'use client';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 export default function AdminLogin() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,11 +16,14 @@ export default function AdminLogin() {
       body: JSON.stringify({ password }),
     });
     if (res.ok) {
-      router.push('/admin');
+      // Hard navigation, not router.push: the sidebar's <Link href="/admin">
+      // prefetches while logged out, and the client router cache can serve
+      // that stale (pre-auth) redirect instead of re-checking the new cookie.
+      window.location.href = '/admin';
     } else {
       setError('Incorrect password.');
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
