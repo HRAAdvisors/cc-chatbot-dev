@@ -31,35 +31,33 @@ export async function POST(req: Request) {
 
   // contextBlock is pre-built by the client from /api/lookup and passed here
   // so we avoid a second DB round-trip in this route
-  let addressQueried = '';
-  let lat: number | undefined;
-  let lon: number | undefined;
-
-  // Parse address for analytics only (lookup was already done client-side)
   const lastUserMsg = messages.slice().reverse().find((m: { role: string }) => m.role === 'user');
-  if (lastUserMsg) {
-    const parsed = extractAddress(lastUserMsg.content);
-    if (parsed) {
-      addressQueried = [parsed.addr, parsed.city, `${parsed.state} ${parsed.zip}`].filter(Boolean).join(', ');
-      // Quick geocode for lat/lon analytics (fire and forget, don't await)
-      geocodeAddress(parsed.addr, parsed.city, parsed.state, parsed.zip).then(geo => {
-        if (geo) { lat = geo.lat; lon = geo.lon; }
-      }).catch(() => {});
-    }
-  }
+  const parsed = lastUserMsg ? extractAddress(lastUserMsg.content) : null;
+  const addressQueried = parsed
+    ? [parsed.addr, parsed.city, `${parsed.state} ${parsed.zip}`].filter(Boolean).join(', ')
+    : '';
 
-  logChat({
+  const baseLogEntry = {
     sessionId,
     userMessage: lastUserMsg?.content || '',
-    intent: intent === 'plans' ? 'internet_offer'
-      : intent === 'services' ? 'digital_equity'
-      : 'other',
+    intent: intent === 'plans' ? 'internet_offer' as const
+      : intent === 'services' ? 'digital_equity' as const
+      : 'other' as const,
     addressQueried: addressQueried || undefined,
-    lat,
-    long: lon,
     numPlansReturned: numPlans || undefined,
     numServicesReturned: numServices || undefined,
-  });
+  };
+
+  // Geocoding is a slow external call, so it shouldn't block the chat
+  // response — log immediately, then patch in lat/lon once geocoding
+  // resolves (fire and forget; logChat swallows its own errors).
+  if (parsed) {
+    geocodeAddress(parsed.addr, parsed.city, parsed.state, parsed.zip)
+      .then(geo => logChat({ ...baseLogEntry, lat: geo?.lat, long: geo?.lon }))
+      .catch(() => logChat(baseLogEntry));
+  } else {
+    logChat(baseLogEntry);
+  }
 
   const result = streamText({
     model: anthropic('claude-sonnet-4-6'),

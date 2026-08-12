@@ -1,16 +1,21 @@
 'use client';
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
+import { Download } from 'lucide-react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { HOUSEHOLD_SIZE_OPTIONS, USAGE_PROFILE_OPTIONS } from '@/lib/plan-utils';
+import type { AddressPoint } from './AddressMap';
+
+const AddressMap = dynamic(() => import('./AddressMap'), { ssr: false });
 
 interface Analytics {
   totals: { total_messages: string; total_sessions: string; unique_addresses: string };
   byIntent: Array<{ intent: string; count: string }>;
   byDay: Array<{ day: string; sessions: string; messages: string }>;
   recent: Array<{
-    session_id: string; created_at: string; user_message: string;
+    id: number; session_id: string; created_at: string; user_message: string;
     intent: string; address_queried: string | null;
     num_plans_returned: number | null; num_services_returned: number | null;
   }>;
@@ -23,6 +28,8 @@ interface Analytics {
   byHouseholdSize: Array<{ household_size: string; count: string }>;
   byUsageProfile: Array<{ usage_profile: string; count: string }>;
   byServiceType: Array<{ service_type_selected: string; count: string }>;
+  byZipIntent: Array<{ zip: string; intent: string; count: string }>;
+  addressPoints: AddressPoint[];
 }
 
 const INTENT_COLORS: Record<string, string> = {
@@ -43,6 +50,20 @@ function MetricCard({ label, value }: { label: string; value: string | number })
       <p className="text-xs text-gray-500 mb-1">{label}</p>
       <p className="text-2xl font-semibold text-gray-900">{value}</p>
     </div>
+  );
+}
+
+function DownloadLink({ href, title }: { href: string; title: string }) {
+  return (
+    <a
+      href={href}
+      download
+      title={title}
+      className="inline-flex items-center justify-center text-gray-400 hover:text-blue-600"
+      onClick={e => e.stopPropagation()}
+    >
+      <Download className="w-3.5 h-3.5" />
+    </a>
   );
 }
 
@@ -87,6 +108,16 @@ export default function AdminDashboard() {
     name: r.service_type_selected,
     value: Number(r.count),
   }));
+
+  interface ZipRow { zip: string; internet_offer: number; digital_equity: number; other: number }
+  const zipByCode = new Map<string, ZipRow>();
+  for (const r of data.byZipIntent) {
+    const row = zipByCode.get(r.zip) ?? { zip: r.zip, internet_offer: 0, digital_equity: 0, other: 0 };
+    row[r.intent as keyof Omit<ZipRow, 'zip'>] = Number(r.count);
+    zipByCode.set(r.zip, row);
+  }
+  const zipData = Array.from(zipByCode.values())
+    .sort((a, b) => (b.internet_offer + b.digital_equity + b.other) - (a.internet_offer + a.digital_equity + a.other));
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -204,6 +235,41 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* Zip code breakdown */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <p className="text-sm font-medium text-gray-700 mb-3">Addresses Searched by ZIP Code</p>
+        {zipData.length === 0
+          ? <p className="text-xs text-gray-400">No data yet</p>
+          : (
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={zipData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="zip" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                <Tooltip />
+                <Legend wrapperStyle={{ fontSize: 11 }} formatter={(value: string) => INTENT_LABELS[value] ?? value} />
+                <Bar dataKey="internet_offer" name="internet_offer" stackId="zip" fill={INTENT_COLORS.internet_offer} isAnimationActive={false} />
+                <Bar dataKey="digital_equity" name="digital_equity" stackId="zip" fill={INTENT_COLORS.digital_equity} isAnimationActive={false} />
+                <Bar dataKey="other" name="other" stackId="zip" fill={INTENT_COLORS.other} radius={[3, 3, 0, 0]} isAnimationActive={false} />
+              </BarChart>
+            </ResponsiveContainer>
+          )
+        }
+      </div>
+
+      {/* Address search map */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <p className="text-sm font-medium text-gray-700 mb-3">Address Search Locations</p>
+        {data.addressPoints.length === 0
+          ? <p className="text-xs text-gray-400">No data yet</p>
+          : (
+            <div className="h-96">
+              <AddressMap points={data.addressPoints} />
+            </div>
+          )
+        }
+      </div>
+
       {/* Recent conversations */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
@@ -243,11 +309,12 @@ export default function AdminDashboard() {
                   <th className="text-left px-4 py-2 text-gray-500 font-medium">Intent</th>
                   <th className="text-left px-4 py-2 text-gray-500 font-medium">Address</th>
                   <th className="text-left px-4 py-2 text-gray-500 font-medium">Plans</th>
+                  <th className="px-4 py-2 w-8" />
                 </tr>
               </thead>
               <tbody>
-                {data.recent.map((row, i) => (
-                  <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                {data.recent.map((row) => (
+                  <tr key={row.id} className="border-b border-gray-50 hover:bg-gray-50">
                     <td className="px-4 py-2 text-gray-400 whitespace-nowrap">
                       {new Date(row.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </td>
@@ -263,6 +330,9 @@ export default function AdminDashboard() {
                     </td>
                     <td className="px-4 py-2 text-gray-600 max-w-[150px] truncate">{row.address_queried || '—'}</td>
                     <td className="px-4 py-2 text-gray-500">{row.num_plans_returned ?? '—'}</td>
+                    <td className="px-4 py-2">
+                      <DownloadLink href={`/api/admin/export?type=message&id=${row.id}`} title="Download this message as CSV" />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -278,6 +348,7 @@ export default function AdminDashboard() {
                   <th className="text-left px-4 py-2 text-gray-500 font-medium">Household</th>
                   <th className="text-left px-4 py-2 text-gray-500 font-medium">Usage</th>
                   <th className="text-left px-4 py-2 text-gray-500 font-medium">Plans</th>
+                  <th className="px-4 py-2 w-8" />
                 </tr>
               </thead>
               <tbody>
@@ -298,6 +369,9 @@ export default function AdminDashboard() {
                       {USAGE_PROFILE_OPTIONS.find(o => o.value === row.usage_profile)?.label ?? row.usage_profile ?? '—'}
                     </td>
                     <td className="px-4 py-2 text-gray-500">{row.num_plans_returned ?? '—'}</td>
+                    <td className="px-4 py-2">
+                      <DownloadLink href={`/api/admin/export?type=session&id=${row.session_id}`} title="Download this session's transcript as CSV" />
+                    </td>
                   </tr>
                 ))}
               </tbody>
