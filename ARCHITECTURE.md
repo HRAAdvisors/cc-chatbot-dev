@@ -79,12 +79,18 @@ There are no independently deployed microservices. Instead, the app has two logi
 
 | Piece | File | Role |
 |---|---|---|
-| Dashboard UI | [components/admin/AdminDashboard.tsx](components/admin/AdminDashboard.tsx), mounted from [app/admin/page.tsx](app/admin/page.tsx) | Fetches `/api/admin/analytics` once on mount and renders: totals, Recharts bar charts (daily activity, intent breakdown, household size, usage profile, service type filtered, **ZIP code searched by intent**), an **address search map**, and a Messages/Sessions toggle table with CSV download — both "download everything" and a per-row download link (single message or single session transcript). |
+| Dashboard UI | [components/admin/AdminDashboard.tsx](components/admin/AdminDashboard.tsx), mounted from [app/admin/page.tsx](app/admin/page.tsx) | Fetches `/api/admin/analytics` (re-fetching whenever the filter bar changes) and renders: totals, Recharts bar charts (daily activity, intent breakdown, household size, usage profile, service type filtered, **ZIP code searched by intent**), an **address search map**, and a Messages/Sessions toggle table with CSV download — both "download everything" and a per-row download link (single message or single session transcript). A filter bar (**intent**, **commissioner district**, **date range**) sits above everything and scopes all of it at once — see §2.1. |
 | Address map | [components/admin/AddressMap.tsx](components/admin/AddressMap.tsx) | Client-only (`next/dynamic`, `ssr: false`). Renders a Mapbox GL map of geocoded address searches, colored/pinned by intent, with click popups. Requires `NEXT_PUBLIC_MAPBOX_API_KEY`. |
 | Login | [app/admin/login/page.tsx](app/admin/login/page.tsx) → [app/api/admin/login/route.ts](app/api/admin/login/route.ts) | Compares submitted password to `process.env.ADMIN_SECRET` (plain `!==` comparison — not constant-time, a minor hardening opportunity rather than a functional gap). On success, sets an `admin_auth` httpOnly cookie (8-hour maxAge, `sameSite: 'lax'`) containing an HMAC-SHA256 token — **not** the raw secret — computed by [lib/admin-auth.ts](lib/admin-auth.ts) `getAdminToken()`. The login page does a hard `window.location.href` redirect (not `router.push`) after success, because the layout's own sidebar `<Link href="/admin">` prefetches that route while logged out, and the client router cache would otherwise serve that stale pre-auth response. |
 | Auth guard | [proxy.ts](proxy.ts) | Next.js 16's `middleware.ts` equivalent (the file was renamed upstream; `matcher: ['/admin', '/admin/:path*', '/api/admin/:path*']`). Recomputes the expected HMAC token from `ADMIN_SECRET` and compares it to the `admin_auth` cookie on every matched request. Lets `/admin/login` and `/api/admin/login` through unconditionally; otherwise redirects `/admin/*` to the login page and returns a 401 JSON body for `/api/admin/*` when the cookie is missing or wrong. **This actually enforces auth** — it is not a no-op. |
-| Analytics API | [app/api/admin/analytics/route.ts](app/api/admin/analytics/route.ts) | `GET`. Runs several aggregate queries against `chat_logs` in parallel: totals, by-intent, by-day (30d), recent messages, recent session rollups ([lib/sessions.ts](lib/sessions.ts)), by-household-size, by-usage-profile, by-service-type, by-ZIP-and-intent, and geocoded address points ([lib/geo.ts](lib/geo.ts)). |
-| Export API | [app/api/admin/export/route.ts](app/api/admin/export/route.ts) | `GET`, query-string driven: `?type=messages` (all rows) / `?type=sessions` (all session rollups) / `?type=message&id=<id>` (one row) / `?type=session&id=<session_id>` (one session's full transcript). Streams a CSV response (`Papa.unparse`) with a `Content-Disposition: attachment` header — plain `<a download>` links, no client-side JS needed. |
+| Analytics API | [app/api/admin/analytics/route.ts](app/api/admin/analytics/route.ts) | `GET`, accepts `?intent=&district=&from=&to=` (all optional, ANDed). Pulls every `chat_logs` row once via [lib/dashboard-data.ts](lib/dashboard-data.ts) `getEnrichedChatLogs()`, filters in JS, and derives every response key (totals, by-intent, by-day, recent messages, session rollups, by-household-size, by-usage-profile, by-service-type, by-ZIP-and-intent, geocoded address points, district dropdown options) from that one filtered array — see §2.1 for why. |
+| Export API | [app/api/admin/export/route.ts](app/api/admin/export/route.ts) | `GET`, query-string driven: `?type=messages`/`?type=sessions` (bulk — accepts the same `intent`/`district`/`from`/`to` filters as the dashboard, so "download CSV" always matches what's on screen) / `?type=message&id=<id>` / `?type=session&id=<session_id>` (single row / single transcript — intentionally **unfiltered**, since these are explicit "get me this exact thing" requests from a per-row download icon). Streams a CSV response (`Papa.unparse`) with a `Content-Disposition: attachment` header — plain `<a download>` links, no client-side JS needed. |
+
+#### 2.1 Filtering: one fetch, JS-side aggregation
+
+The dashboard's three filters (intent, commissioner district, date range) all apply at once to every chart, the map, and the table. Commissioner district can only be determined by a point-in-polygon test — there's no PostGIS on this Neon instance — so at least one filter is structurally JS-side. Rather than splitting logic (district filtered in JS, intent/date filtered in SQL) across two layers, [lib/dashboard-data.ts](lib/dashboard-data.ts) does it all in one place: `getEnrichedChatLogs()` runs a single SQL query for every `chat_logs` row (lat/long backfilled via the same `points`-table LATERAL join described in §3, plus a `district` field from [lib/districts.ts](lib/districts.ts) `districtForPoint()`), then `applyFilters()` and a handful of small aggregation helpers (`groupByIntent`, `groupByDay`, `buildSessionRollups`, etc.) do the rest as plain array operations. At the current data volume (~150-200 rows) this is negligible work — not a shortcut taken under pressure, but the actually-correct architecture once district forces at least one JS-side filter.
+
+`lib/districts.ts` loads `public/commissioner_districts.geojson` (converted from a county-supplied shapefile via `ogr2ogr -f GeoJSON -t_srs EPSG:4326`, 7 features — one polygon per district A–G, with `COMMISSION`/`NAME` properties) once at module init and hand-rolls ray-casting point-in-polygon — no `turf` or other geospatial dependency, since there are only 7 simple single-ring polygons and no other geospatial need in the app.
 
 There is no RPC, message queue, or network hop between "services" — they communicate only via (1) direct in-process function calls between `app/api/*` route handlers and `lib/*` modules, and (2) the shared Neon Postgres database.
 
@@ -92,7 +98,8 @@ There is no RPC, message queue, or network hop between "services" — they commu
 
 | Store | Where | Contents | Provisioning |
 |---|---|---|---|
-| Neon Postgres | `DATABASE_URL` env var, client in [lib/db.ts](lib/db.ts) | `points` table: address-level FCC/BDC broadband availability (`addr, city, state, zip, bld_type, brandnames, techbest, techrules, max_dl, max_ul, fixedcnt, cschoice, lat, long`) — also used to backfill map coordinates for `chat_logs` rows logged before the fix below (see [lib/geo.ts](lib/geo.ts) `addressPointsQuery()`, which re-splits `address_queried` and joins back to `points`). `chat_logs` table: per-message analytics (`id, session_id, created_at, user_message, intent, address_queried, lat, long, num_plans_returned, num_services_returned, household_size, usage_profile, service_type_selected`). | ⚠️ No migration files or schema-definition scripts exist in this repo. Both tables must already exist on the Neon instance — they were provisioned out-of-band. |
+| Neon Postgres | `DATABASE_URL` env var, client in [lib/db.ts](lib/db.ts) | `points` table: address-level FCC/BDC broadband availability (`addr, city, state, zip, bld_type, brandnames, techbest, techrules, max_dl, max_ul, fixedcnt, cschoice, lat, long`) — also used to backfill map coordinates for `chat_logs` rows logged before the fix below (see [lib/dashboard-data.ts](lib/dashboard-data.ts) `getEnrichedChatLogs()`, which re-splits `address_queried` and joins back to `points`). `chat_logs` table: per-message analytics (`id, session_id, created_at, user_message, intent, address_queried, lat, long, num_plans_returned, num_services_returned, household_size, usage_profile, service_type_selected`). | ⚠️ No migration files or schema-definition scripts exist in this repo. Both tables must already exist on the Neon instance — they were provisioned out-of-band. |
+| Bundled GeoJSON | [public/commissioner_districts.geojson](public/commissioner_districts.geojson) | Clark County commissioner district boundaries (7 polygons, districts A–G), converted from a county-supplied shapefile. Loaded by [lib/districts.ts](lib/districts.ts) for the admin dashboard's district filter/point-in-polygon test. | Static; re-derive from an updated shapefile via `ogr2ogr -f GeoJSON -t_srs EPSG:4326` if district boundaries ever change. |
 | Bundled CSV | [public/plans_with_tech.csv](public/plans_with_tech.csv) | ISP plan catalog (provider, price, speeds, data cap, contract terms, low-income discount, etc.). | Loaded synchronously at module-init via `fs.readFileSync` + Papaparse in [lib/plans.ts](lib/plans.ts). Baked into the deployed build — updating plans means editing/redeploying this file, not a DB write. |
 | Hardcoded TS array | [lib/services.ts](lib/services.ts) | 108 digital-equity resource records (73 local Clark County/Las Vegas orgs + 35 national programs). Per its header comment, generated from `digital_inclusion_resources_claude enhanced.xlsx`. | Same as above — code change + redeploy to update. |
 
@@ -195,14 +202,16 @@ sequenceDiagram
     Dashboard->>Proxy: GET /admin (cookie attached)
     Proxy->>Proxy: recompute HMAC, compare to cookie
     Proxy-->>Dashboard: allowed
-    Dashboard->>Analytics: GET /api/admin/analytics (cookie attached)
+    Admin->>Dashboard: set intent/district/date filters
+    Dashboard->>Analytics: GET /api/admin/analytics?intent=&district=&from=&to= (cookie attached)
     Proxy-->>Analytics: allowed
-    Analytics->>DB: parallel aggregate queries (totals, sessions, ZIP/intent, geo points, ...)
+    Analytics->>DB: one SELECT — every chat_logs row, lat/long backfilled
     DB-->>Analytics: rows
-    Analytics-->>Dashboard: JSON
+    Analytics->>Analytics: districtForPoint() per row, then filter + aggregate in JS
+    Analytics-->>Dashboard: JSON (totals, charts, sessions, map points — all filtered)
     Dashboard->>Dashboard: render charts, map, Messages/Sessions table
-    Admin->>Export: click "Download CSV" (or per-row link)
-    Export->>DB: SELECT (all, or filtered by id/session_id)
+    Admin->>Export: click "Download CSV" (same filters) or a per-row link (unfiltered)
+    Export->>DB: same one-SELECT-then-filter pipeline, or a direct id/session_id lookup
     DB-->>Export: rows
     Export-->>Admin: text/csv, Content-Disposition: attachment
 ```
@@ -238,8 +247,8 @@ lib/
 ├── plan-utils.ts        # Plan/PlanGroups types, household/usage options, recommendPlan()
 ├── services.ts          # Static digital-equity resource data (108 records)
 ├── services-lookup.ts   # Haversine distance grouping
-├── sessions.ts           # Session-level chat_logs rollup query (admin)
-├── geo.ts                # ZIP/intent aggregation + address→lat/long backfill (admin)
+├── dashboard-data.ts     # Admin: one chat_logs fetch + filters + all chart/session aggregation
+├── districts.ts          # Admin: commissioner district point-in-polygon
 ├── admin-auth.ts         # HMAC-SHA256 admin session token
 ├── csv.ts                # Client-side CSV blob builder (public-facing download button)
 ├── cache.ts             # In-memory TTL/LRU cache factory
@@ -247,7 +256,8 @@ lib/
 └── utils.ts             # cn() helper
 
 public/
-└── plans_with_tech.csv  # Bundled ISP plan catalog
+├── plans_with_tech.csv          # Bundled ISP plan catalog
+└── commissioner_districts.geojson  # Commissioner district boundaries (A–G)
 
 proxy.ts                 # Next.js 16's middleware.ts equivalent — enforces admin_auth
                           # cookie check on /admin/* and /api/admin/*

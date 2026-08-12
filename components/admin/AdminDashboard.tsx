@@ -30,6 +30,7 @@ interface Analytics {
   byServiceType: Array<{ service_type_selected: string; count: string }>;
   byZipIntent: Array<{ zip: string; intent: string; count: string }>;
   addressPoints: AddressPoint[];
+  districtOptions: Array<{ value: string; label: string }>;
 }
 
 const INTENT_COLORS: Record<string, string> = {
@@ -71,13 +72,24 @@ export default function AdminDashboard() {
   const [data, setData] = useState<Analytics | null>(null);
   const [error, setError] = useState('');
   const [view, setView] = useState<'messages' | 'sessions'>('messages');
+  const [intent, setIntent] = useState('');
+  const [district, setDistrict] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  const filterParams = new URLSearchParams({
+    ...(intent && { intent }),
+    ...(district && { district }),
+    ...(dateFrom && { from: dateFrom }),
+    ...(dateTo && { to: dateTo }),
+  }).toString();
 
   useEffect(() => {
-    fetch('/api/admin/analytics')
+    fetch(`/api/admin/analytics${filterParams ? `?${filterParams}` : ''}`)
       .then(r => r.json())
       .then(setData)
       .catch(() => setError('Failed to load analytics'));
-  }, []);
+  }, [filterParams]);
 
   if (error) return <div className="p-8 text-red-500 text-sm">{error}</div>;
   if (!data) return <div className="p-8 text-gray-400 text-sm">Loading…</div>;
@@ -126,6 +138,62 @@ export default function AdminDashboard() {
         <p className="text-xs text-gray-500 mt-0.5">Clark County Digital Navigator Assistant</p>
       </div>
 
+      {/* Filters — apply to every chart, the map, and the table/CSV export below */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap items-end gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Intent</label>
+          <select
+            value={intent}
+            onChange={e => setIntent(e.target.value)}
+            className="text-xs rounded-lg border border-gray-200 px-2.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All</option>
+            <option value="internet_offer">Internet Plans</option>
+            <option value="digital_equity">Digital Resources</option>
+            <option value="other">General</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Commissioner District</label>
+          <select
+            value={district}
+            onChange={e => setDistrict(e.target.value)}
+            className="text-xs rounded-lg border border-gray-200 px-2.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All</option>
+            {data.districtOptions.map(d => (
+              <option key={d.value} value={d.value}>{d.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">From</label>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={e => setDateFrom(e.target.value)}
+            className="text-xs rounded-lg border border-gray-200 px-2.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">To</label>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={e => setDateTo(e.target.value)}
+            className="text-xs rounded-lg border border-gray-200 px-2.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        {(intent || district || dateFrom || dateTo) && (
+          <button
+            onClick={() => { setIntent(''); setDistrict(''); setDateFrom(''); setDateTo(''); }}
+            className="text-xs font-medium text-gray-400 hover:text-gray-600 pb-1.5"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+
       {/* Totals */}
       <div className="grid grid-cols-3 gap-4">
         <MetricCard label="Total Messages" value={Number(data.totals.total_messages).toLocaleString()} />
@@ -137,7 +205,9 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-2 gap-4">
         {/* Daily activity */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <p className="text-sm font-medium text-gray-700 mb-3">Daily Activity (last 30 days)</p>
+          <p className="text-sm font-medium text-gray-700 mb-3">
+            Daily Activity{dateFrom || dateTo ? ` (${dateFrom || '…'} – ${dateTo || '…'})` : ''}
+          </p>
           {dayData.length === 0
             ? <p className="text-xs text-gray-400">No data yet</p>
             : (
@@ -292,7 +362,7 @@ export default function AdminDashboard() {
             </button>
           </div>
           <a
-            href={`/api/admin/export?type=${view}`}
+            href={`/api/admin/export?type=${view}${filterParams ? `&${filterParams}` : ''}`}
             download
             className="text-xs font-medium text-blue-600 hover:text-blue-700"
           >
