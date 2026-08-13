@@ -424,12 +424,15 @@ export default function Chatbot() {
     <div className="flex flex-col h-screen bg-slate-50">
       {/* Header */}
       <header className="bg-blue-700 px-4 py-4 shrink-0 shadow-sm">
-        <div className="max-w-2xl mx-auto flex gap-3">
+        <button
+          onClick={() => window.location.reload()}
+          className="max-w-2xl w-full mx-auto flex gap-3 text-left cursor-pointer"
+        >
           <div>
             <p className="text-base font-bold text-white">Clark County Digital Equity Assistant</p>
             <p className="text-sm text-blue-100">Internet plans & digital resources in Clark County, NV</p>
           </div>
-        </div>
+        </button>
       </header>
 
       {/* Messages */}

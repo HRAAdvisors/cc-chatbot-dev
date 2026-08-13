@@ -1,12 +1,12 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { ExternalLink, Navigation } from 'lucide-react';
+import { ExternalLink, MapPin } from 'lucide-react';
 import SortableTable, { type Column, type SortState } from './SortableTable';
 import DownloadCsvButton from './DownloadCsvButton';
 import CopyButton from './CopyButton';
 import TextButton from './TextButton';
 import { formatServiceSms, serviceCsvRows } from './ServiceCard';
-import { flattenServiceGroups, getDirectionsUrl, type ServiceGroups, type ServiceTier, type ServiceWithDistance } from '@/lib/services-lookup';
+import { flattenServiceGroups, getMapUrl, type ServiceGroups, type ServiceTier, type ServiceWithDistance } from '@/lib/services-lookup';
 import { SERVICE_TYPES } from '@/lib/services';
 
 type Row = ServiceWithDistance & { tier: ServiceTier };
@@ -55,11 +55,11 @@ export default function ServicesTable({ serviceGroups, initialTypeFilter }: Prop
         Visit <ExternalLink size={11} />
       </a>
     ) : '—' },
-    { key: 'directions', header: 'Directions', render: s => {
-      const directionsUrl = getDirectionsUrl(s);
-      return directionsUrl ? (
-        <a href={directionsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-blue-600 hover:underline">
-          <Navigation size={11} /> Directions
+    { key: 'map', header: 'Map', render: s => {
+      const mapUrl = getMapUrl(s);
+      return mapUrl ? (
+        <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-blue-600 hover:underline">
+          <MapPin size={11} /> Map
         </a>
       ) : '—';
     } },
