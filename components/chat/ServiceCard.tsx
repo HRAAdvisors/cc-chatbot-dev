@@ -1,8 +1,9 @@
 'use client';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Navigation } from 'lucide-react';
 import CopyButton from './CopyButton';
+import TextButton from './TextButton';
 import DownloadCsvButton from './DownloadCsvButton';
-import type { ServiceWithDistance } from '@/lib/services-lookup';
+import { getDirectionsUrl, type ServiceWithDistance } from '@/lib/services-lookup';
 
 export const formatServiceSms = (s: ServiceWithDistance): string => {
   const lines = [
@@ -32,6 +33,7 @@ export const serviceCsvRows = (services: ServiceWithDistance[]): Array<Array<str
 ];
 
 function ServiceRow({ service }: { service: ServiceWithDistance }) {
+  const directionsUrl = getDirectionsUrl(service);
   return (
     <div className="border-b last:border-0 py-3 px-4">
       <div className="flex items-start justify-between gap-2">
@@ -56,7 +58,14 @@ function ServiceRow({ service }: { service: ServiceWithDistance }) {
             Website <ExternalLink size={11} />
           </a>
         )}
+        {directionsUrl && (
+          <a href={directionsUrl} target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline">
+            <Navigation size={11} /> Directions
+          </a>
+        )}
         <CopyButton text={formatServiceSms(service)} />
+        <TextButton text={formatServiceSms(service)} />
       </div>
     </div>
   );

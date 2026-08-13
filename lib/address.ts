@@ -1,4 +1,5 @@
 import sql from './db';
+import { createTTLCache } from './cache';
 
 // ─── Normalization ─────────────────────────────────────────────────────────
 
@@ -61,18 +62,34 @@ export const extractAddress = (text: string): ParsedAddress | null => {
 
 // ─── Geocode ───────────────────────────────────────────────────────────────
 
+// Nominatim is the slowest, most rate-limited step in the address flow, and
+// the same address is looked up repeatedly (lookup route, chat route's
+// analytics fallback, session pivots) — cache results independently of any
+// caller so those repeats never leave the process.
+const GEOCODE_FOUND_TTL_MS = 24 * 60 * 60 * 1000;
+const GEOCODE_NOT_FOUND_TTL_MS = 10 * 60 * 1000;
+type GeocodeResult = { lat: number; lon: number } | null;
+const geocodeCache = createTTLCache<GeocodeResult>(GEOCODE_FOUND_TTL_MS, 2000);
+
 export const geocodeAddress = async (addr: string, city: string | null, state: string, zip: string) => {
   const parts = [addr, city, `${state} ${zip}`.trim()].filter(Boolean);
-  const q = encodeURIComponent(parts.join(', '));
+  const cacheKey = parts.join(', ');
+
+  const cached = geocodeCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
+  const q = encodeURIComponent(cacheKey);
   const url = `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&countrycodes=us`;
   try {
     const res  = await fetch(url, { headers: { 'User-Agent': 'ClarkCountyDigitalEquityChatbot/2.0' } });
     const data = await res.json() as Array<{ lat: string; lon: string }>;
-    if (data.length > 0) return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+    const result: GeocodeResult = data.length > 0 ? { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) } : null;
+    geocodeCache.set(cacheKey, result, result ? GEOCODE_FOUND_TTL_MS : GEOCODE_NOT_FOUND_TTL_MS);
+    return result;
   } catch (e) {
     console.error('[geocode] error:', e);
+    return null;
   }
-  return null;
 };
 
 // ─── Points lookup ─────────────────────────────────────────────────────────

@@ -48,6 +48,13 @@ export const nationalServicesOnly = (): ServiceGroups => ({
 export const getTopServices = (groups: ServiceGroups, n = 3): ServiceWithDistance[] =>
   [...groups.within1, ...groups.within5, ...groups.within10, ...groups.national].slice(0, n);
 
+// National/online services have no lat/long (see ./services.ts), so there's
+// nowhere to route directions to.
+export const getDirectionsUrl = (service: ServiceWithDistance): string | null =>
+  service.lat != null && service.long != null
+    ? `https://www.google.com/maps/dir/?api=1&destination=${service.lat},${service.long}`
+    : null;
+
 export type ServiceTier = 'within1' | 'within5' | 'within10' | 'national';
 
 export const flattenServiceGroups = (groups: ServiceGroups): Array<ServiceWithDistance & { tier: ServiceTier }> => [

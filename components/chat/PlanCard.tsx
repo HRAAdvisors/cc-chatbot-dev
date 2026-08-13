@@ -1,9 +1,10 @@
 'use client';
 import { useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import CopyButton from './CopyButton';
+import TextButton from './TextButton';
 import DownloadCsvButton from './DownloadCsvButton';
-import { flattenPlans, getCheapestPlan, getFastestPlan, type Plan, type PlanGroups } from '@/lib/plan-utils';
+import { flattenPlans, getCheapestPlan, getFastestPlan, getProviderWebsite, type Plan, type PlanGroups } from '@/lib/plan-utils';
 
 // CSV price strings already include a leading "$" (e.g. "$65.00 ") — strip
 // it before re-adding our own to avoid rendering "$$65.00".
@@ -43,6 +44,7 @@ export const formatPlanSms = (plan: Plan, address?: string): string => {
 };
 
 export function PlanRow({ plan, address }: { plan: Plan; address?: string }) {
+  const website = getProviderWebsite(plan.provider);
   return (
     <div className="border-b last:border-0 py-3 px-4">
       <div className="flex items-start justify-between gap-2">
@@ -66,8 +68,15 @@ export function PlanRow({ plan, address }: { plan: Plan; address?: string }) {
           <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">100/25 Mbps+</span>
         )}
       </div>
-      <div className="mt-2">
+      <div className="flex items-center gap-3 mt-2">
+        {website && (
+          <a href={website} target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline">
+            Visit website <ExternalLink size={11} />
+          </a>
+        )}
         <CopyButton text={formatPlanSms(plan, address)} />
+        <TextButton text={formatPlanSms(plan, address)} />
       </div>
     </div>
   );

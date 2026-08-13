@@ -1,10 +1,12 @@
 'use client';
 import { useMemo, useState } from 'react';
+import { ExternalLink } from 'lucide-react';
 import SortableTable, { type Column, type SortState } from './SortableTable';
 import DownloadCsvButton from './DownloadCsvButton';
 import CopyButton from './CopyButton';
+import TextButton from './TextButton';
 import { formatPlanSms, formatPrice, planCsvRows } from './PlanCard';
-import { toNumber, type Plan } from '@/lib/plan-utils';
+import { getProviderWebsite, toNumber, type Plan } from '@/lib/plan-utils';
 
 interface Props {
   plans: Plan[];
@@ -49,7 +51,20 @@ export default function PlansTable({ plans, address }: Props) {
     { key: 'upload', header: 'Upload', sortValue: p => toNumber(p.uploadMbps) ?? 0, render: p => `${p.uploadMbps} Mbps` },
     { key: 'contract', header: 'Contract', sortValue: p => p.contract === 'Y' ? 1 : 0, render: p => p.contract === 'Y' ? `${p.contractMonths} mo` : 'None' },
     { key: 'lowIncome', header: 'Low-Income', sortValue: p => p.lowIncome === 'Y' ? 1 : 0, render: p => p.lowIncome === 'Y' ? `$${p.liDiscount} off` : '—' },
-    { key: 'copy', header: '', render: p => <CopyButton text={formatPlanSms(p, address)} /> },
+    { key: 'website', header: 'Website', render: p => {
+      const website = getProviderWebsite(p.provider);
+      return website ? (
+        <a href={website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-blue-600 hover:underline">
+          Visit <ExternalLink size={11} />
+        </a>
+      ) : '—';
+    } },
+    { key: 'copy', header: '', render: p => (
+      <div className="flex items-center gap-3">
+        <CopyButton text={formatPlanSms(p, address)} />
+        <TextButton text={formatPlanSms(p, address)} />
+      </div>
+    ) },
   ];
 
   const sorted = useMemo(() => {

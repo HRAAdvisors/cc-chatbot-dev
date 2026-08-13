@@ -36,15 +36,17 @@ export const USAGE_PROFILE_OPTIONS: Array<{ value: UsageProfile; label: string; 
 ];
 
 // Device counts include phones, laptops, smart TVs, consoles, and any other
-// gadget that's online at the same time — not just computers.
+// gadget that's online at the same time — not just computers. Labels stick to
+// the count itself; usage type is asked separately in USAGE_PROFILE_OPTIONS,
+// so repeating activity descriptions here just duplicated that question.
 export const DEVICE_COUNT_OPTIONS: Array<{ value: DeviceCount; label: string; icon: string }> = [
-  { value: '1-2', label: '1-2 devices — browsing, email, music', icon: '📱' },
-  { value: '2-3', label: '2-3 devices — on-demand video streaming', icon: '💻' },
-  { value: '3-5', label: '3-5 devices — HD streaming, video calls', icon: '📺' },
-  { value: '5-10', label: '5-10 devices — multi-device HD & gaming', icon: '🎮' },
-  { value: '10-15', label: '10-15 devices — competitive gaming, livestreaming', icon: '🕹️' },
-  { value: '15-30', label: '15-30 devices — gaming across many devices', icon: '🏠' },
-  { value: '30+', label: '30+ devices — business or enterprise use', icon: '🏢' },
+  { value: '1-2', label: '1-2 devices', icon: '📱' },
+  { value: '2-3', label: '2-3 devices', icon: '💻' },
+  { value: '3-5', label: '3-5 devices', icon: '📺' },
+  { value: '5-10', label: '5-10 devices', icon: '🎮' },
+  { value: '10-15', label: '10-15 devices', icon: '🕹️' },
+  { value: '15-30', label: '15-30 devices', icon: '🏠' },
+  { value: '30+', label: '30+ devices', icon: '🏢' },
 ];
 
 const USAGE_BASELINE_MBPS: Record<UsageProfile, { dl: number; ul: number }> = {
@@ -70,6 +72,49 @@ const DEVICE_COUNT_MIN_MBPS: Record<DeviceCount, number> = {
   '15-30': 1000,
   '30+': 2000,
 };
+
+// Provider names in the CSV have no website column, so official homepages
+// are hardcoded here. Keyed by trimmed/lowercased provider name since the
+// CSV's `Providers` field is used verbatim (see lib/plans.ts) and isn't
+// guaranteed consistent casing/whitespace across rows.
+const PROVIDER_WEBSITES_RAW: Record<string, string> = {
+  'AT&T': 'https://www.att.com',
+  'CenturyLink': 'https://www.centurylink.com',
+  'Cogent Communication': 'https://www.cogentco.com',
+  'Cox Communications': 'https://www.cox.com',
+  'Fort Mojave Telecommunications Inc': 'https://www.ftmojave.com',
+  'GeoLinks': 'https://www.geolinks.com',
+  'Hotwire Communications': 'https://hotwirecommunications.com',
+  'HughesNet': 'https://www.hughesnet.com',
+  'InfoWest': 'https://infowest.com',
+  'Kwikbit': 'https://www.kwikbit.com',
+  'Moapa Valley Telephone Co.': 'https://mvtel.com',
+  'NetFortris': 'https://www.netfortris.com',
+  'Optimum': 'https://www.optimum.com',
+  'Peerless Network': 'https://www.peerlessnetwork.com',
+  'Rio Virgin Telephone': 'https://relianceconnects.com',
+  'Rise Broadband': 'https://www.risebroadband.com',
+  'Starlink': 'https://www.starlink.com',
+  'Stimulus Technologies': 'https://www.stimulustech.com',
+  'T-Mobile': 'https://www.t-mobile.com',
+  'TDS Telecom': 'https://tdstelecom.com',
+  'TPx Communications': 'https://www.tpx.com',
+  'Tristate Wi-Fi by Wi-Fiber': 'https://www.tristatewifi.com',
+  'Valley Communications Association Inc': 'https://www.valleycom.com',
+  'Verizon': 'https://www.verizon.com',
+  'Viasat Inc': 'https://www.viasat.com',
+  'WeLink Communications Inc': 'https://welink.com',
+  'isp.net': 'https://www.isp.net',
+};
+
+const normalizeProviderKey = (s: string) => s.trim().toLowerCase();
+
+const PROVIDER_WEBSITES: Record<string, string> = Object.fromEntries(
+  Object.entries(PROVIDER_WEBSITES_RAW).map(([k, v]) => [normalizeProviderKey(k), v])
+);
+
+export const getProviderWebsite = (provider: string): string | undefined =>
+  PROVIDER_WEBSITES[normalizeProviderKey(provider)];
 
 // Price strings come out of the CSV as "$65.00 " — strip everything but
 // digits/dot/minus before parsing so currency formatting doesn't break this.

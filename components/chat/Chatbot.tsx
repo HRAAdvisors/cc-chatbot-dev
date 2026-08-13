@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useRef, useState, Fragment } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo, Fragment, memo } from 'react';
 import { Send } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import PromptSuggestions, { type PromptIntent } from './PromptSuggestions';
@@ -37,6 +37,8 @@ interface LookupResult {
   found: boolean;
   validated?: boolean;
   address?: string;
+  lat?: number;
+  lon?: number;
   intent: Intent;
 }
 
@@ -152,8 +154,8 @@ function renderInline(text: string) {
   });
 }
 
-function MarkdownContent({ text }: { text: string }) {
-  const lines = text.split('\n');
+const MarkdownContent = memo(function MarkdownContent({ text }: { text: string }) {
+  const lines = useMemo(() => text.split('\n'), [text]);
   return (
     <>
       {lines.map((line, i) => {
@@ -162,7 +164,7 @@ function MarkdownContent({ text }: { text: string }) {
       })}
     </>
   );
-}
+});
 
 const sessionId = nanoid();
 
@@ -235,6 +237,8 @@ export default function Chatbot() {
     let contextBlock = '';
     let numPlans: number | undefined;
     let numServices: number | undefined;
+    let lat: number | undefined;
+    let lon: number | undefined;
 
     if (hasNewAddress || (isPivot && lastLookup)) {
       try {
@@ -247,6 +251,9 @@ export default function Chatbot() {
           : lastLookup!;
 
         if (hasNewAddress) setLastLookup(result);
+
+        lat = result.lat;
+        lon = result.lon;
 
         const showPlans = intent !== 'services';
         const showServices = intent !== 'plans';
@@ -311,7 +318,7 @@ export default function Chatbot() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history, sessionId, contextBlock, intent, numPlans, numServices }),
+        body: JSON.stringify({ messages: history, sessionId, contextBlock, intent, numPlans, numServices, lat, lon }),
         signal: abortRef.current.signal,
       });
 

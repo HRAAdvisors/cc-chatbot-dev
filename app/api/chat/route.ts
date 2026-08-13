@@ -1,4 +1,4 @@
-import { streamText } from 'ai';
+import { streamText, smoothStream } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { nanoid } from 'nanoid';
 import { extractAddress, geocodeAddress } from '@/lib/address';
@@ -27,6 +27,8 @@ export async function POST(req: Request) {
     intent,
     numPlans,
     numServices,
+    lat: clientLat,
+    lon: clientLon,
   } = await req.json();
 
   // contextBlock is pre-built by the client from /api/lookup and passed here
@@ -48,15 +50,15 @@ export async function POST(req: Request) {
     numServicesReturned: numServices || undefined,
   };
 
-  // Geocoding is a slow external call, so it shouldn't block the chat
-  // response — log immediately, then patch in lat/lon once geocoding
-  // resolves (fire and forget; logChat swallows its own errors).
-  if (parsed) {
+  // The client already geocoded this address via /api/lookup — reuse that
+  // instead of hitting Nominatim a second time. Only re-geocode here as a
+  // fallback (e.g. a pivot turn where the client didn't have coordinates).
+  if (parsed && (clientLat == null || clientLon == null)) {
     geocodeAddress(parsed.addr, parsed.city, parsed.state, parsed.zip)
       .then(geo => logChat({ ...baseLogEntry, lat: geo?.lat, long: geo?.lon }))
       .catch(() => logChat(baseLogEntry));
   } else {
-    logChat(baseLogEntry);
+    logChat({ ...baseLogEntry, lat: clientLat, long: clientLon });
   }
 
   const result = streamText({
@@ -64,6 +66,7 @@ export async function POST(req: Request) {
     system: SYSTEM_PROMPT + (clientContext ? `\n\n${clientContext}` : ''),
     messages,
     maxOutputTokens: 1024,
+    experimental_transform: smoothStream({ chunking: 'word' }),
   });
 
   return result.toTextStreamResponse();
