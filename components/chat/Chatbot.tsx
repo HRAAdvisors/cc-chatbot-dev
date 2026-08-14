@@ -188,6 +188,7 @@ export default function Chatbot() {
   const [lastLookup, setLastLookup] = useState<Omit<LookupResult, 'intent'> | null>(null);
   const [planFlow, setPlanFlow] = useState<PlanFlowState>(IDLE_PLAN_FLOW);
   const [serviceFlow, setServiceFlow] = useState<ServiceFlowState>(IDLE_SERVICE_FLOW);
+  const [showMainMenu, setShowMainMenu] = useState(false);
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const lastScrolledId = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -211,6 +212,7 @@ export default function Chatbot() {
     // below if this turn triggers a new address lookup.
     setPlanFlow(IDLE_PLAN_FLOW);
     setServiceFlow(IDLE_SERVICE_FLOW);
+    setShowMainMenu(false);
 
     const detectedIntent = classifyIntent(text);
     const prevIntent = activeIntent;
@@ -356,6 +358,13 @@ export default function Chatbot() {
 
   const closingLine = "Thanks for using the Clark County Digital Equity Assistant — let me know if there's anything else I can help you with!";
 
+  const handleBackToMenu = useCallback(() => {
+    appendAssistantText('Sure! What would you like to do next?');
+    setPlanFlow(IDLE_PLAN_FLOW);
+    setServiceFlow(IDLE_SERVICE_FLOW);
+    setShowMainMenu(true);
+  }, [appendAssistantText]);
+
   const handleSeeAllPlans = useCallback(() => {
     appendAssistantText(`Here are all the internet plans available at your address. ${closingLine}`);
     setPlanFlow(f => ({ ...f, step: 'all_shown' }));
@@ -487,7 +496,7 @@ export default function Chatbot() {
                     to reference. Only applies once the guided flow has released the bottom
                     slot (it renders its own cards below), and only to the reply actually
                     being read, not to every past message that lacked its own lookup. */}
-                {!isUser && !result && isLastMsg && !isStreaming && lastLookup && planFlow.step === 'idle' && serviceFlow.step === 'idle' && (
+                {!isUser && !result && isLastMsg && !isStreaming && lastLookup && planFlow.step === 'idle' && serviceFlow.step === 'idle' && !showMainMenu && (
                   <div className="mt-1">
                     {lastLookup.planGroups && activeIntent !== 'services' && (
                       <PlanCard planGroups={lastLookup.planGroups} address={lastLookup.address} mode="top" />
@@ -504,10 +513,25 @@ export default function Chatbot() {
                 {!isUser && isLastMsg && !isStreaming && planFlow.step !== 'idle' && (
                   <div className="mt-1">
                     {planFlow.step === 'all_shown' && planFlow.planGroups && (
-                      <PlansTable plans={flattenPlans(planFlow.planGroups)} address={planFlow.address} />
+                      <>
+                        <PlansTable plans={flattenPlans(planFlow.planGroups)} address={planFlow.address} />
+                        <ChoiceButtons
+                          options={[{ value: 'menu', label: 'Back to main menu', icon: '🏠' }]}
+                          onSelect={handleBackToMenu}
+                        />
+                      </>
                     )}
                     {planFlow.step === 'recommended_shown' && planFlow.recommendedPlan && (
-                      <RecommendedPlanCard plan={planFlow.recommendedPlan} address={planFlow.address} note={planFlow.recommendationNote} />
+                      <>
+                        <RecommendedPlanCard plan={planFlow.recommendedPlan} address={planFlow.address} note={planFlow.recommendationNote} />
+                        <ChoiceButtons
+                          options={[
+                            { value: 'all', label: 'Show me all plans', icon: '📋' },
+                            { value: 'menu', label: 'Back to main menu', icon: '🏠' },
+                          ]}
+                          onSelect={(v: 'all' | 'menu') => (v === 'all' ? handleSeeAllPlans() : handleBackToMenu())}
+                        />
+                      </>
                     )}
                     {planFlow.step === 'top_shown' && (
                       <ChoiceButtons
@@ -545,18 +569,30 @@ export default function Chatbot() {
                       <ChoiceButtons options={SERVICE_TYPES.map(t => ({ value: t, label: t }))} onSelect={handleServiceType} />
                     )}
                     {serviceFlow.step === 'all_shown' && serviceFlow.serviceGroups && (
-                      <ServicesTable serviceGroups={serviceFlow.serviceGroups} />
+                      <>
+                        <ServicesTable serviceGroups={serviceFlow.serviceGroups} />
+                        <ChoiceButtons
+                          options={[{ value: 'menu', label: 'Back to main menu', icon: '🏠' }]}
+                          onSelect={handleBackToMenu}
+                        />
+                      </>
                     )}
                     {serviceFlow.step === 'filtered_shown' && serviceFlow.serviceGroups && (
-                      <ServicesTable serviceGroups={serviceFlow.serviceGroups} initialTypeFilter={serviceFlow.selectedType} />
+                      <>
+                        <ServicesTable serviceGroups={serviceFlow.serviceGroups} initialTypeFilter={serviceFlow.selectedType} />
+                        <ChoiceButtons
+                          options={[
+                            { value: 'all', label: 'Show me all resources', icon: '📋' },
+                            { value: 'menu', label: 'Back to main menu', icon: '🏠' },
+                          ]}
+                          onSelect={(v: 'all' | 'menu') => (v === 'all' ? handleSeeAllResources() : handleBackToMenu())}
+                        />
+                      </>
                     )}
                   </div>
                 )}
 
-                {!isUser && isLastMsg && !isStreaming && (
-                  (planFlow.step === 'all_shown' || planFlow.step === 'recommended_shown' ||
-                   serviceFlow.step === 'all_shown' || serviceFlow.step === 'filtered_shown')
-                ) && (
+                {!isUser && isLastMsg && !isStreaming && showMainMenu && (
                   <div className="mt-1">
                     <PromptSuggestions onSelect={sendMessage} />
                   </div>
