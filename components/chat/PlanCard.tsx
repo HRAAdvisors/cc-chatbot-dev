@@ -111,7 +111,8 @@ export default function PlanCard({ planGroups, address, mode = 'all' }: Props) {
   const toggle = (key: string) => {
     setOpenProviders(prev => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };

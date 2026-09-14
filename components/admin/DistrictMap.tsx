@@ -37,8 +37,10 @@ export default function DistrictMap({ counts, districtOptions }: Props) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const countsRef = useRef(counts);
   const districtOptionsRef = useRef(districtOptions);
-  countsRef.current = counts;
-  districtOptionsRef.current = districtOptions;
+  useEffect(() => {
+    countsRef.current = counts;
+    districtOptionsRef.current = districtOptions;
+  }, [counts, districtOptions]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;

@@ -14,7 +14,7 @@ export default function DownloadCsvButton({ filename, rows, label = 'CSV', class
     <button
       onClick={() => downloadCsv(filename, rows)}
       title="Download as CSV"
-      className={`inline-flex items-center gap-1 text-sm text-slate-400 hover:text-blue-600 transition-colors ${className}`}
+      className={`inline-flex items-center gap-1 text-sm text-chat-secondary-foreground hover:text-blue-600 transition-colors ${className}`}
     >
       <Download size={13} />
       {label}
