@@ -202,14 +202,14 @@ export default function AdminDashboard() {
       </div>
 
       {/* Totals */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <MetricCard label="Total Messages" value={Number(data.totals.total_messages).toLocaleString()} />
         <MetricCard label="Unique Sessions" value={Number(data.totals.total_sessions).toLocaleString()} />
         <MetricCard label="Unique ZIP Codes Looked Up" value={Number(data.totals.unique_zip_codes).toLocaleString()} />
       </div>
 
       {/* Charts row */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Daily activity */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <p className="text-sm font-medium text-gray-700 mb-3">
@@ -253,7 +253,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Guided-flow selections */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Household size */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <p className="text-sm font-medium text-gray-700 mb-3">Household Size Selected</p>
