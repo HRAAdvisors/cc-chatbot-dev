@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState, useMemo, Fragment, memo } from 'react';
 import { nanoid } from 'nanoid';
-import { ArrowDown, House, MapPin, MessageSquarePlus, RotateCcw } from 'lucide-react';
+import { ArrowDown, House, MapPin, RefreshCw, RotateCcw } from 'lucide-react';
 import ChatInput, { type SendOptions } from './ChatInput';
 import ResetConfirmation from './ResetConfirmation';
 import { LanguageToggle, useLanguage } from './LanguageProvider';
@@ -228,7 +228,7 @@ export default function Chatbot() {
   const [showMainMenu, setShowMainMenu] = useState(false);
   const [pendingConfirm, setPendingConfirm] = useState<RequestJob | null>(null);
   const [workflow, setWorkflow] = useState<{ prompt: string; intent: PromptIntent } | null>(null);
-  const [resetAction, setResetAction] = useState<'home' | 'new' | null>(null);
+  const [resetAction, setResetAction] = useState(false);
   const [skipResetConfirmation, setSkipResetConfirmation] = useState(false);
   const [dontShowResetAgain, setDontShowResetAgain] = useState(false);
   const [inputKey, setInputKey] = useState(0);
@@ -283,16 +283,12 @@ export default function Chatbot() {
     activeJob.current = null;
     setIsStreaming(false);
   }, []);
-  const resetClient = useCallback((destination: 'home' | 'new') => {
+  const resetClient = useCallback(() => {
     invalidateRequest();
     sessionRef.current = nanoid();
-    const retained = destination === 'new' ? workflow : null;
-    setWorkflow(retained);
-    setActiveIntent(retained?.intent ?? 'both');
-    setMessages(retained ? [
-      { id: nanoid(), role: 'user', content: retained.prompt, workflowPrompt: true },
-      { id: nanoid(), role: 'assistant', content: 'Please enter the new client’s address, including the city and ZIP code.' },
-    ] : []);
+    setWorkflow(null);
+    setActiveIntent('both');
+    setMessages([]);
     setLastLookup(null);
     setResultMap(new Map());
     setPlanFlow(IDLE_PLAN_FLOW);
@@ -308,18 +304,18 @@ export default function Chatbot() {
     shownPlanDisclaimerRef.current = false;
     nearBottom.current = true;
     setShowJump(false);
-    setResetAction(null);
-    setAnnouncement(retained ? 'New client started in the same workflow. Enter an address.' : 'Conversation cleared. Choose one of the three options.');
+    setResetAction(false);
+    setAnnouncement('Conversation cleared. Choose one of the three options.');
     focusInput();
-  }, [invalidateRequest, workflow, focusInput]);
-  const requestReset = useCallback((destination: 'home' | 'new') => {
+  }, [invalidateRequest, focusInput]);
+  const requestReset = useCallback(() => {
     const skipConfirmation = skipResetConfirmation || document.cookie.split('; ').includes('cc-skip-reset-confirmation=1');
     if (!skipConfirmation && (messages.length || hasDraft || lastLookup || isStreaming || changingAddress)) {
       resetFocus.current = document.activeElement as HTMLElement;
       resetConfirmed.current = false;
       setDontShowResetAgain(false);
-      setResetAction(destination);
-    } else resetClient(destination);
+      setResetAction(true);
+    } else resetClient();
   }, [messages.length, hasDraft, lastLookup, isStreaming, changingAddress, resetClient, skipResetConfirmation]);
 
   // Declared ahead of sendMessage/handleAddressConfirm — both reference it in
@@ -586,7 +582,14 @@ export default function Chatbot() {
   }, [planFlow.step, appendAssistantText, invalidateAnswers]);
   const closingLine = "Let me know if you need anything else for this case.";
 
-  const handleBackToMenu = useCallback(() => requestReset('home'), [requestReset]);
+  const handleBackToMenu = useCallback(() => {
+    setPlanFlow(IDLE_PLAN_FLOW);
+    setServiceFlow(IDLE_SERVICE_FLOW);
+    setPendingConfirm(null);
+    setShowMainMenu(true);
+    nearBottom.current = true;
+    setAnnouncement('Back to the main menu. The conversation is still here — choose a new topic to continue.');
+  }, []);
 
   const handleSeeAllPlans = useCallback(() => {
     appendAssistantText(`Here are all the internet plans available at the client's address. ${closingLine}`, { key: "Here are all the internet plans available at the client's address.", suffix: closingLine });
@@ -670,25 +673,25 @@ export default function Chatbot() {
         <div className="max-w-3xl mx-auto flex flex-wrap items-center gap-3 py-3.5 text-sm">
           {messages.length > 0 && !showMainMenu && (
             <nav aria-label={t('Client navigation')} className="order-2 flex basis-full shrink-0 items-center gap-1 sm:order-first sm:basis-auto">
-              <button type="button" className="flex size-11 items-center justify-center rounded-xl hover:bg-primary-foreground/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-foreground transition-colors" aria-label={t('Home')} title={t('Home')} onClick={() => requestReset('home')}><House aria-hidden="true" className="size-5" strokeWidth={2.25} /></button>
-              <button type="button" className="flex size-11 items-center justify-center rounded-xl hover:bg-primary-foreground/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-foreground transition-colors" aria-label={t('New client')} title={t('New client')} onClick={() => requestReset('new')}><MessageSquarePlus aria-hidden="true" className="size-5" strokeWidth={2.25} /></button>
+              <button type="button" className="flex size-11 items-center justify-center rounded-xl hover:bg-primary-foreground/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-foreground transition-colors" aria-label={t('Home')} title={t('Home')} onClick={handleBackToMenu}><House aria-hidden="true" className="size-5" strokeWidth={2.25} /></button>
+              <button type="button" className="flex size-11 items-center justify-center rounded-xl hover:bg-primary-foreground/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-foreground transition-colors" aria-label={t('Clear conversation')} title={t('Clear conversation')} onClick={requestReset}><RefreshCw aria-hidden="true" className="size-5" strokeWidth={2.25} /></button>
             </nav>
           )}
           <div className="min-w-0 flex-1 basis-0">
-            <h1 className="text-xl sm:text-xl font-semibold tracking-tight text-balance leading-tight">{t('Clark County Digital Equity Assistant')}</h1>
+            <h2 className="text-lg sm:text-xl font-semibold tracking-tight text-balance leading-tight">{t('Clark County Digital Equity Assistant')}</h2>
           </div>
           <div className="order-1 ml-auto shrink-0 sm:order-3"><LanguageToggle /></div>
         </div>
       </header>
 
-      <ResetConfirmation action={resetAction} dontShowAgain={dontShowResetAgain} onDontShowAgainChange={setDontShowResetAgain} onCancel={() => setResetAction(null)} onConfirm={() => {
+      <ResetConfirmation open={resetAction} dontShowAgain={dontShowResetAgain} onDontShowAgainChange={setDontShowResetAgain} onCancel={() => setResetAction(false)} onConfirm={() => {
         if (!resetAction) return;
         if (dontShowResetAgain) {
           setSkipResetConfirmation(true);
           document.cookie = `cc-skip-reset-confirmation=1; Path=/; Max-Age=31536000; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
         }
         resetConfirmed.current = true;
-        resetClient(resetAction);
+        resetClient();
       }} onClosed={() => { if (resetConfirmed.current) focusInput(); else resetFocus.current?.focus(); }} />
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">{t(announcement)}</div>
       {lastLookup?.validated && (
