@@ -1,4 +1,5 @@
 'use client';
+import { useLanguage } from './LanguageProvider';
 import { useState } from 'react';
 import { Copy, Check } from 'lucide-react';
 
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export default function CopyButton({ text, className = '' }: Props) {
+  const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -31,11 +33,11 @@ export default function CopyButton({ text, className = '' }: Props) {
   return (
     <button
       onClick={handleCopy}
-      title="Copy for SMS"
-      className={`inline-flex items-center gap-1 text-sm text-chat-secondary-foreground hover:text-blue-600 transition-colors ${className}`}
+      title={t('Copy for SMS')}
+      className={`inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors ${className}`}
     >
-      {copied ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
-      {copied ? 'Copied!' : 'Copy'}
+      {copied ? <Check size={13} className="text-success" /> : <Copy size={13} />}
+      {t(copied ? 'Copied!' : 'Copy')}
     </button>
   );
 }

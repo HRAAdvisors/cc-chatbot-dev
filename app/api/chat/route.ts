@@ -28,6 +28,7 @@ export async function POST(req: Request) {
     sessionId = nanoid(),
     contextBlock: clientContext = '',
     intent,
+    locale: requestedLocale,
     numPlans,
     numServices,
     lat: clientLat,
@@ -66,7 +67,7 @@ export async function POST(req: Request) {
 
   const result = streamText({
     model: anthropic('claude-sonnet-4-6'),
-    system: SYSTEM_PROMPT + (clientContext ? `\n\n${clientContext}` : ''),
+    system: SYSTEM_PROMPT + (clientContext ? `\n\n${clientContext}` : '') + `\n\nRespond in ${requestedLocale === 'es' ? 'Spanish' : 'English'}, regardless of the language used in earlier messages or source data. Keep provider and organization names, street addresses, phone numbers, URLs, prices, and speed values unchanged. Use plain, accessible language. Do not use em dashes.`,
     messages,
     maxOutputTokens: 1024,
     experimental_transform: smoothStream({ chunking: 'word' }),

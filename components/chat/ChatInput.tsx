@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useLanguage } from './LanguageProvider';
 import { Send, MapPin, Loader2, Square, X } from 'lucide-react';
 
 interface AddressContext {
@@ -45,6 +46,7 @@ const CLARK_PROXIMITY = '-115.1398,36.1699';
 const CLARK_BBOX = '-115.9,35.0,-114.0,36.85';
 
 export default function ChatInput({ onSend, disabled, onDraftChange, placeholder = 'Type @ to search an address, or ask a question…', autoFocus, onStop, onCancel }: ChatInputProps) {
+  const { t } = useLanguage();
   const [value, setValue] = useState('');
   const valueRef = useRef('');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -170,12 +172,13 @@ export default function ChatInput({ onSend, disabled, onDraftChange, placeholder
     setSuggestions([]);
     onSend(text.replace(/@(?=\S)/g, ''), { addressConfirmed });
   };
-  const feedback = state === 'short' ? 'Keep typing the address to see matches…'
-    : state === 'loading' ? 'Searching addresses…'
-    : state === 'unavailable' ? 'Address search is temporarily unavailable.'
-    : state === 'outside' ? 'This address is outside Clark County, Nevada.'
-    : state === 'empty' ? 'No matching address found. Check the spelling.'
-    : state === 'success' ? `${suggestions.length} address suggestions available. Use the arrow keys to select.` : '';
+  const feedback = state === 'success'
+    ? t('{count} address suggestions available. Use the arrow keys to select.', { count: suggestions.length })
+    : t(state === 'short' ? 'Keep typing the address to see matches…'
+      : state === 'loading' ? 'Searching addresses…'
+      : state === 'unavailable' ? 'Address search is temporarily unavailable.'
+      : state === 'outside' ? 'This address is outside Clark County, Nevada.'
+      : state === 'empty' ? 'No matching address found. Check the spelling.' : '');
 
   return (
     <div ref={wrapperRef} className="relative">
@@ -183,10 +186,10 @@ export default function ChatInput({ onSend, disabled, onDraftChange, placeholder
       {open && (
         <div className="absolute bottom-full left-0 right-0 mb-2 rounded-xl border border-border bg-background text-foreground shadow-lg overflow-hidden">
           <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-muted text-muted-foreground">
-            <MapPin size={16} /><span className="text-sm font-medium">Clark County addresses</span>
+            <MapPin size={16} /><span className="text-sm font-medium">{t('Clark County addresses')}</span>
             {state === 'loading' && <Loader2 size={16} className="animate-spin motion-reduce:animate-none" />}
           </div>
-          <ul id={listId} role="listbox" aria-label="Address suggestions" className="max-h-64 overflow-y-auto">
+          <ul id={listId} role="listbox" aria-label={t('Address suggestions')} className="max-h-64 overflow-y-auto">
             {suggestions.map((s, i) => (
               <li key={s.mapboxId} id={`${listId}-${i}`} role="option" aria-selected={i === activeIndex}
                 onMouseDown={e => e.preventDefault()} onClick={() => selectSuggestion(s)} onMouseEnter={() => setActiveIndex(i)}
@@ -209,11 +212,11 @@ export default function ChatInput({ onSend, disabled, onDraftChange, placeholder
             }
             if (e.key === 'Escape' && open) { e.preventDefault(); dismiss(); }
           }}
-          placeholder={placeholder} disabled={disabled} role="combobox" aria-label={placeholder} aria-expanded={open}
+          placeholder={t(placeholder)} disabled={disabled} role="combobox" aria-label={t(placeholder)} aria-expanded={open}
           aria-controls={open ? listId : undefined} aria-activedescendant={open && suggestions.length ? `${listId}-${activeIndex}` : undefined} aria-autocomplete="list"
-          className="min-w-0 flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-base text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50" />
-        {onCancel && <button type="button" aria-label="Cancel address change" title="Cancel address change" onClick={onCancel} className="flex size-11 shrink-0 items-center justify-center rounded-xl text-chat-secondary-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"><X aria-hidden="true" size={20} /></button>}
-        <button type={onStop ? 'button' : 'submit'} aria-label={onStop ? 'Stop' : 'Send message'} title={onStop ? 'Stop' : 'Send message'} onClick={onStop} disabled={!onStop && (disabled || !value.trim())} className="size-11 shrink-0 rounded-xl bg-blue-600 hover:bg-blue-700 text-primary-foreground disabled:opacity-40 flex items-center justify-center transition-colors motion-reduce:transition-none">
+          className="min-w-0 flex-1 rounded-xl border border-input bg-card px-4 py-2.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent disabled:opacity-50" />
+        {onCancel && <button type="button" aria-label={t('Cancel address change')} title={t('Cancel address change')} onClick={onCancel} className="flex size-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring transition-colors"><X aria-hidden="true" size={20} /></button>}
+        <button type={onStop ? 'button' : 'submit'} aria-label={t(onStop ? 'Stop' : 'Send message')} title={t(onStop ? 'Stop' : 'Send message')} onClick={onStop} disabled={!onStop && (disabled || !value.trim())} className="size-11 shrink-0 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-40 flex items-center justify-center transition-colors motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
           {onStop ? <Square aria-hidden="true" size={18} className="fill-current" /> : <Send aria-hidden="true" size={18} />}
         </button>
       </form>

@@ -1,4 +1,5 @@
 'use client';
+import { useLanguage } from './LanguageProvider';
 import type { ReactNode } from 'react';
 import { ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 
@@ -25,24 +26,25 @@ interface Props<T> {
 }
 
 export default function SortableTable<T>({ columns, rows, rowKey, sort, onSortChange, emptyMessage = 'No results match your filters.' }: Props<T>) {
+  const { t } = useLanguage();
   return (
     <div className="max-h-[420px] overflow-y-auto overflow-x-auto">
       <table className="w-full text-sm">
-        <thead className="sticky top-0 bg-slate-50">
-          <tr className="border-b border-slate-200">
+        <thead className="sticky top-0 bg-muted z-10">
+          <tr className="border-b border-border">
             {columns.map(col => (
-              <th key={col.key} className={`text-left px-3 py-2 font-medium text-slate-600 ${col.className ?? ''}`}>
+              <th key={col.key} className={`text-left px-3 py-2.5 font-semibold text-muted-foreground ${col.className ?? ''}`}>
                 {col.sortValue ? (
                   <button
                     onClick={() => onSortChange(col.key)}
-                    className="inline-flex items-center gap-1 hover:text-blue-600 transition-colors"
+                    className="inline-flex items-center gap-1 hover:text-primary transition-colors"
                   >
-                    {col.header}
+                    {t(col.header)}
                     {sort?.key === col.key
-                      ? (sort.dir === 'asc' ? <ChevronUp size={13} /> : <ChevronDown size={13} />)
-                      : <ArrowUpDown size={12} className="text-slate-300" />}
+                      ? (sort.dir === 'asc' ? <ChevronUp size={13} className="text-primary" /> : <ChevronDown size={13} className="text-primary" />)
+                      : <ArrowUpDown size={12} className="text-muted-foreground/40" />}
                   </button>
-                ) : col.header}
+                ) : t(col.header)}
               </th>
             ))}
           </tr>
@@ -50,12 +52,12 @@ export default function SortableTable<T>({ columns, rows, rowKey, sort, onSortCh
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="px-3 py-6 text-center text-slate-400">{emptyMessage}</td>
+              <td colSpan={columns.length} className="px-3 py-8 text-center text-muted-foreground">{t(emptyMessage)}</td>
             </tr>
           ) : rows.map(row => (
-            <tr key={rowKey(row)} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+            <tr key={rowKey(row)} className="border-b border-border last:border-0 hover:bg-muted/60 transition-colors">
               {columns.map(col => (
-                <td key={col.key} className={`px-3 py-2.5 text-slate-700 ${col.className ?? ''}`}>{col.render(row)}</td>
+                <td key={col.key} className={`px-3 py-2.5 text-foreground align-top ${col.className ?? ''}`}>{col.render(row)}</td>
               ))}
             </tr>
           ))}

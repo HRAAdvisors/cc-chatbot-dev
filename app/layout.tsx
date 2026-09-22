@@ -1,15 +1,24 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Public_Sans } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
+const publicSans = Public_Sans({
   variable: "--font-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Clark County Digital Navigator Assistant",
-  description: "Find internet plans and digital equity resources in Clark County, NV",
+  title: "Clark County Digital Equity Assistant",
+  description:
+    "Find internet plans and digital inclusion resources for Clark County, Nevada. Available in English and Spanish. Disponible en inglés y español.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1a3e8c",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -20,9 +29,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} h-full antialiased`}
+      className={`${publicSans.variable} h-full antialiased bg-background`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col bg-background text-foreground">{children}</body>
     </html>
   );
 }

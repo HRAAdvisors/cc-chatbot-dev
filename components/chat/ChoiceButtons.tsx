@@ -1,4 +1,5 @@
 'use client';
+import { useLanguage } from './LanguageProvider';
 
 interface Option<T extends string> {
   value: T;
@@ -12,16 +13,17 @@ interface Props<T extends string> {
 }
 
 export default function ChoiceButtons<T extends string>({ options, onSelect }: Props<T>) {
+  const { t } = useLanguage();
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2 mb-1 max-w-lg">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-3 mb-1 max-w-lg">
       {options.map(opt => (
         <button
           key={opt.value}
           onClick={() => onSelect(opt.value)}
-          className="flex items-center gap-3 px-4 py-3.5 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 hover:border-blue-300 text-left text-base text-blue-700 font-medium transition-colors shadow-sm"
+          className="flex items-center gap-2.5 rounded-xl border border-primary/25 bg-accent px-4 py-3 text-left text-[0.95rem] font-medium text-accent-foreground shadow-sm transition-all hover:border-primary/45 hover:bg-primary hover:text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none"
         >
-          {opt.icon && <span className="text-xl">{opt.icon}</span>}
-          <span>{opt.label}</span>
+          {opt.icon && <span aria-hidden="true" className="text-lg">{opt.icon}</span>}
+          <span>{t(opt.label)}</span>
         </button>
       ))}
     </div>

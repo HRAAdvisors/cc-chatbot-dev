@@ -1,9 +1,11 @@
 'use client';
 import { useCallback, useEffect, useRef, useState, useMemo, Fragment, memo } from 'react';
 import { nanoid } from 'nanoid';
-import { ArrowDown, House, MessageSquarePlus, RotateCcw } from 'lucide-react';
+import { ArrowDown, House, MapPin, MessageSquarePlus, RotateCcw } from 'lucide-react';
 import ChatInput, { type SendOptions } from './ChatInput';
 import ResetConfirmation from './ResetConfirmation';
+import { LanguageToggle, useLanguage } from './LanguageProvider';
+import { translateCopy, translateServiceType, type Locale, type MessageCopy } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import PromptSuggestions, { type PromptIntent } from './PromptSuggestions';
 import PlanCard, { RecommendedPlanCard } from './PlanCard';
@@ -30,6 +32,9 @@ interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  copy?: MessageCopy;
+  locale?: Locale;
+  workflowPrompt?: boolean;
   archived?: boolean;
   superseded?: boolean;
   answerKey?: 'household' | 'devices' | 'usage' | 'service' | 'recommendation';
@@ -90,6 +95,8 @@ const IDLE_SERVICE_FLOW: ServiceFlowState = { step: 'idle' };
 const ADDRESS_RE = /\d+[\w\s.#-]+(?:street|avenue|boulevard|drive|road|lane|court|place|circle|highway|parkway|square|st|ave|blvd|dr|rd|ln|ct|way|pl|cir|hwy|pkwy|loop|sq)/i;
 
 const PLANS_PATTERNS = [
+  /\b(?:planes?|proveedores?|servicio|ofertas?)\s+(?:de\s+)?internet\b/i,
+  /\b(?:banda ancha|internet (?:gratis|econ[oó]mico|barato))\b/i,
   /internet\s+(plan|offer|option|provider|service)/i,
   /\bisp\b/i,
   /broadband/i,
@@ -98,6 +105,7 @@ const PLANS_PATTERNS = [
   /which\s+(plan|provider)/i,
 ];
 const SERVICES_PATTERNS = [
+  /\b(?:capacitaci[oó]n|habilidades digitales|alfabetizaci[oó]n digital|computadoras?|tabletas?|dispositivos?)\b/i,
   /digital\s+(skill|equity|resource|service|literacy)/i,
   /\btraining\b/i,
   /device\s+access/i,
@@ -172,7 +180,7 @@ const MarkdownContent = memo(function MarkdownContent({ text }: { text: string }
   return (
     <>
       {lines.map((line, i) => {
-        if (line.trim() === '---') return <hr key={i} className="border-gray-200 my-2" />;
+        if (line.trim() === '---') return <hr key={i} className="border-border my-2" />;
         return <span key={i}>{i > 0 && '\n'}{renderInline(line)}</span>;
       })}
     </>
@@ -209,6 +217,7 @@ function logSelection(sessionId: string, fields: { householdSize?: string; usage
 }
 
 export default function Chatbot() {
+  const { locale, localeRef, t } = useLanguage();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [resultMap, setResultMap] = useState<ResultMap>(new Map());
@@ -255,6 +264,7 @@ export default function Chatbot() {
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
+    if (!messages.length) { viewport.scrollTop = 0; return; }
     if (nearBottom.current) viewport.scrollTop = viewport.scrollHeight;
     else setShowJump(true);
   }, [messages, isStreaming, planFlow, serviceFlow, pendingConfirm]);
@@ -280,7 +290,7 @@ export default function Chatbot() {
     setWorkflow(retained);
     setActiveIntent(retained?.intent ?? 'both');
     setMessages(retained ? [
-      { id: nanoid(), role: 'user', content: retained.prompt },
+      { id: nanoid(), role: 'user', content: retained.prompt, workflowPrompt: true },
       { id: nanoid(), role: 'assistant', content: 'Please enter the new client’s address, including the city and ZIP code.' },
     ] : []);
     setLastLookup(null);
@@ -315,8 +325,8 @@ export default function Chatbot() {
   // Declared ahead of sendMessage/handleAddressConfirm — both reference it in
   // their dependency arrays, which are evaluated as soon as those useCallback
   // calls run, so it must already be initialized by then.
-  const appendAssistantText = useCallback((text: string) => {
-    setMessages(prev => [...prev, { id: nanoid(), role: 'assistant', content: text }]);
+  const appendAssistantText = useCallback((text: string, copy?: MessageCopy) => {
+    setMessages(prev => [...prev, { id: nanoid(), role: 'assistant', content: text, copy }]);
   }, []);
 
   // Turns a fetched (or reused) lookup result into the LLM contextBlock and
@@ -395,7 +405,7 @@ export default function Chatbot() {
     setError(null);
     setRetryJob(null);
     setIsStreaming(true);
-    setMessages(prev => prev.map(m => m.id === job.assistantMsgId ? { ...m, content: '', stopped: false, resultsReady: false } : m));
+    setMessages(prev => prev.map(m => m.id === job.assistantMsgId ? { ...m, content: '', copy: undefined, locale: undefined, stopped: false, resultsReady: false } : m));
     setAnnouncement(stage === 'lookup' ? 'Looking up the address.' : 'Preparing a reply.');
     try {
       if (job.needsLookup && !job.result) {
@@ -418,7 +428,7 @@ export default function Chatbot() {
         }
         // Typed addresses retain verification; unchanged dropdown selections skip it.
         if (job.result.confirmAddress && !job.confirmed) {
-          setMessages(prev => prev.map(m => m.id === job.assistantMsgId ? { ...m, content: `Did you mean **${job.result!.confirmAddress}**?` } : m));
+          setMessages(prev => prev.map(m => m.id === job.assistantMsgId ? { ...m, content: `Did you mean **${job.result!.confirmAddress}**?`, copy: { key: 'Did you mean **{address}**?', values: { address: job.result!.confirmAddress! } } } : m));
           setPendingConfirm(job);
           setAnnouncement('Please confirm the matched address.');
           return;
@@ -438,9 +448,10 @@ export default function Chatbot() {
       }
       stage = 'response';
       setAnnouncement('Preparing a reply.');
+      const responseLocale = localeRef.current;
       const response = await fetch('/api/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: job.history, sessionId: job.sessionId, intent: job.intent, ...job.outcome }),
+        body: JSON.stringify({ messages: job.history, sessionId: job.sessionId, intent: job.intent, locale: responseLocale, ...job.outcome }),
         signal: controller.signal,
       });
       if (!response.ok || !response.body) throw new Error('Reply unavailable');
@@ -452,7 +463,7 @@ export default function Chatbot() {
           const { done, value } = await reader.read();
           if (!current()) { await reader.cancel(); return; }
           content += done ? decoder.decode() : decoder.decode(value, { stream: true });
-          setMessages(prev => prev.map(m => m.id === job.assistantMsgId ? { ...m, content } : m));
+          setMessages(prev => prev.map(m => m.id === job.assistantMsgId ? { ...m, content, locale: responseLocale, copy: undefined } : m));
           if (done) break;
         }
       } finally { reader.releaseLock(); }
@@ -470,7 +481,7 @@ export default function Chatbot() {
       const message = stage === 'lookup' ? 'The address lookup could not finish. Retry the lookup or enter a different address.' : 'The reply could not finish. Retry the reply; any address results already found will be reused.';
       setError(message);
       setRetryJob(job);
-      setMessages(prev => prev.map(m => m.id === job.assistantMsgId ? { ...m, content: m.content || message, stopped: true } : m));
+      setMessages(prev => prev.map(m => m.id === job.assistantMsgId ? { ...m, content: m.content || message, locale: m.content ? m.locale : undefined, stopped: true } : m));
       setAnnouncement(message);
     } finally {
       clearTimeout(timeout);
@@ -481,13 +492,13 @@ export default function Chatbot() {
         focusInput();
       }
     }
-  }, [buildLookupOutcome, appendAssistantText, focusInput]);
+  }, [buildLookupOutcome, appendAssistantText, focusInput, localeRef]);
 
   const sendMessage = useCallback((text: string, intentOverride?: Intent, opts?: SendOptions) => {
     if (abortRef.current || isStreaming) return;
     const intent = changingAddress ? activeIntent : intentOverride ?? classifyIntent(text) ?? activeIntent;
     const needsLookup = changingAddress || !!opts?.addressConfirmed || ADDRESS_RE.test(text);
-    const userMsg: Message = { id: nanoid(), role: 'user', content: text, addressChange: changingAddress };
+    const userMsg: Message = { id: nanoid(), role: 'user', content: text, addressChange: changingAddress, workflowPrompt: !!intentOverride };
     const assistantMsgId = nanoid();
     // A new address starts a clean model context; the old transcript remains historical.
     const history = [...(needsLookup ? (workflow ? [{ role: 'user', content: workflow.prompt }] : []) : messages.filter(m => !m.archived && !m.superseded && !m.stopped && m.content)), userMsg].map(m => ({ role: m.role, content: m.content }));
@@ -510,7 +521,7 @@ export default function Chatbot() {
     const job = pendingConfirm;
     setPendingConfirm(null);
     if (value === 'no') {
-      setMessages(prev => prev.map(m => m.id === job.assistantMsgId ? { ...m, content: 'Please retype the address, including the city and ZIP code.' } : m));
+      setMessages(prev => prev.map(m => m.id === job.assistantMsgId ? { ...m, copy: undefined, content: 'Please retype the address, including the city and ZIP code.' } : m));
       setAnnouncement('Address not changed. Please enter another address.');
       focusInput();
     } else { void runRequest({ ...job, confirmed: true }); }
@@ -519,7 +530,7 @@ export default function Chatbot() {
     const job = activeJob.current;
     invalidateRequest();
     if (job) {
-      setMessages(prev => prev.map(m => m.id === job.assistantMsgId ? { ...m, content: m.content || 'Request stopped.', stopped: true } : m));
+      setMessages(prev => prev.map(m => m.id === job.assistantMsgId ? { ...m, content: m.content || 'Request stopped.', locale: m.content ? m.locale : undefined, stopped: true } : m));
       setRetryJob(job);
     }
     setError(null);
@@ -547,13 +558,13 @@ export default function Chatbot() {
     focusInput();
   }, [invalidateRequest, focusInput]);
 
-  const recordAnswer = useCallback((answerKey: NonNullable<Message['answerKey']>, content: string, role: Message['role'] = 'user') => {
+  const recordAnswer = useCallback((answerKey: NonNullable<Message['answerKey']>, content: string, role: Message['role'] = 'user', copy?: MessageCopy) => {
     setRetryJob(null);
     setError(null);
     nearBottom.current = true;
-    setMessages(prev => [...prev.map(m => !m.archived && m.answerKey === answerKey && m.role === role ? { ...m, superseded: true } : m), { id: nanoid(), role, content, answerKey }]);
-    setAnnouncement(content);
-  }, []);
+    setMessages(prev => [...prev.map(m => !m.archived && m.answerKey === answerKey && m.role === role ? { ...m, superseded: true } : m), { id: nanoid(), role, content, answerKey, copy }]);
+    setAnnouncement(copy ? translateCopy(localeRef.current, copy) : content);
+  }, [localeRef]);
   const invalidateAnswers = useCallback((keys: Array<NonNullable<Message['answerKey']>>) => {
     setMessages(prev => prev.map(m => !m.archived && m.answerKey && keys.includes(m.answerKey) ? { ...m, superseded: true } : m));
   }, []);
@@ -578,7 +589,7 @@ export default function Chatbot() {
   const handleBackToMenu = useCallback(() => requestReset('home'), [requestReset]);
 
   const handleSeeAllPlans = useCallback(() => {
-    appendAssistantText(`Here are all the internet plans available at the client's address. ${closingLine}`);
+    appendAssistantText(`Here are all the internet plans available at the client's address. ${closingLine}`, { key: "Here are all the internet plans available at the client's address.", suffix: closingLine });
     setPlanFlow(f => ({ ...f, step: 'all_shown' }));
   }, [appendAssistantText]);
 
@@ -591,14 +602,16 @@ export default function Chatbot() {
   }, [appendAssistantText, invalidateAnswers]);
 
   const handleHouseholdSize = useCallback((size: HouseholdSize) => {
-    recordAnswer('household', `Household: ${HOUSEHOLD_SIZE_OPTIONS.find(o => o.value === size)?.label}`);
+    const label = HOUSEHOLD_SIZE_OPTIONS.find(o => o.value === size)!.label;
+    recordAnswer('household', `Household: ${label}`, 'user', { key: 'Household: {value}', values: { value: label } });
     appendAssistantText("About how many devices are usually connected at once — phones, laptops, smart TVs, consoles, and so on?");
     setPlanFlow(f => ({ ...f, step: 'awaiting_devices', householdSize: size }));
     logSelection(sessionRef.current, { householdSize: size });
   }, [appendAssistantText, recordAnswer]);
 
   const handleDeviceCount = useCallback((count: DeviceCount) => {
-    recordAnswer('devices', `Connected devices: ${DEVICE_COUNT_OPTIONS.find(o => o.value === count)?.label}`);
+    const label = DEVICE_COUNT_OPTIONS.find(o => o.value === count)!.label;
+    recordAnswer('devices', `Connected devices: ${label}`, 'user', { key: 'Connected devices: {value}', values: { value: label } });
     appendAssistantText("Which best describes how the household uses the internet?");
     setPlanFlow(f => ({ ...f, step: 'awaiting_usage', deviceCount: count }));
     logSelection(sessionRef.current, { deviceCount: count });
@@ -612,8 +625,9 @@ export default function Chatbot() {
         ? "Based on household size, device count, and internet use, here's the recommended plan."
         : "None of the available plans fully meet the ideal speed for this household, but here's the fastest option available."
       : "No matching plan was found for this address.";
-    recordAnswer('usage', `Internet use: ${USAGE_PROFILE_OPTIONS.find(o => o.value === usage)?.label}`);
-    recordAnswer('recommendation', `${intro} ${closingLine}`, 'assistant');
+    const label = USAGE_PROFILE_OPTIONS.find(o => o.value === usage)!.label;
+    recordAnswer('usage', `Internet use: ${label}`, 'user', { key: 'Internet use: {value}', values: { value: label } });
+    recordAnswer('recommendation', `${intro} ${closingLine}`, 'assistant', { key: intro, suffix: closingLine });
     setPlanFlow(f => ({
       ...f,
       usageProfile: usage,
@@ -625,7 +639,7 @@ export default function Chatbot() {
   }, [planFlow, recordAnswer]);
 
   const handleSeeAllResources = useCallback(() => {
-    appendAssistantText(`Here are all the digital equity resources near this address. ${closingLine}`);
+    appendAssistantText(`Here are all the digital equity resources near this address. ${closingLine}`, { key: 'Here are all the digital equity resources near this address.', suffix: closingLine });
     setServiceFlow(f => ({ ...f, step: 'all_shown' }));
   }, [appendAssistantText]);
 
@@ -638,35 +652,32 @@ export default function Chatbot() {
   }, [appendAssistantText, invalidateAnswers]);
 
   const handleServiceType = useCallback((type: string) => {
-    recordAnswer('service', `Resource type: ${type}`);
-    recordAnswer('service', `Here are the ${type.toLowerCase()} resources near this address. ${closingLine}`, 'assistant');
+    recordAnswer('service', `Resource type: ${type}`, 'user', { key: 'Resource type: {value}', values: { value: type } });
+    recordAnswer('service', `Here are the ${type.toLowerCase()} resources near this address. ${closingLine}`, 'assistant', { key: 'Here are the {type} resources near this address.', values: { type }, suffix: closingLine });
     setServiceFlow(f => ({ ...f, step: 'filtered_shown', selectedType: type }));
     logSelection(sessionRef.current, { serviceType: type });
   }, [recordAnswer]);
 
+  // The free-text composer only belongs inside an active workflow. On the
+  // landing screen and the main menu, the cards (and in-section filters) drive
+  // navigation, so the composer is hidden there.
+  const atMenu = messages.length === 0 || showMainMenu;
+
   return (
-    <div className="flex flex-col h-screen bg-slate-50">
+    <div className="flex flex-col h-dvh bg-background">
       {/* Header */}
-      <header className="bg-blue-700 px-4 py-4 shrink-0 shadow-sm">
-        <div className="flex items-center gap-3">
+      <header className="bg-primary text-primary-foreground shrink-0 shadow-sm ring-1 ring-black/5 px-4 sm:px-6">
+        <div className="max-w-3xl mx-auto flex flex-wrap items-center gap-3 py-3.5 text-sm">
           {messages.length > 0 && !showMainMenu && (
-            <nav aria-label="Client navigation" className="flex shrink-0 items-center text-primary-foreground">
-              <button type="button" className="flex size-11 items-center justify-center rounded-lg hover:opacity-75 focus-visible:outline-2 focus-visible:outline-offset-2" aria-label="Home" title="Home" onClick={() => requestReset('home')}><House aria-hidden="true" className="size-6" strokeWidth={2.5} /></button>
-              <button type="button" className="flex size-11 items-center justify-center rounded-lg hover:opacity-75 focus-visible:outline-2 focus-visible:outline-offset-2" aria-label="New client" title="New client" onClick={() => requestReset('new')}><MessageSquarePlus aria-hidden="true" className="size-6" strokeWidth={2.5} /></button>
+            <nav aria-label={t('Client navigation')} className="order-2 flex basis-full shrink-0 items-center gap-1 sm:order-first sm:basis-auto">
+              <button type="button" className="flex size-11 items-center justify-center rounded-xl hover:bg-primary-foreground/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-foreground transition-colors" aria-label={t('Home')} title={t('Home')} onClick={() => requestReset('home')}><House aria-hidden="true" className="size-5" strokeWidth={2.25} /></button>
+              <button type="button" className="flex size-11 items-center justify-center rounded-xl hover:bg-primary-foreground/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-foreground transition-colors" aria-label={t('New client')} title={t('New client')} onClick={() => requestReset('new')}><MessageSquarePlus aria-hidden="true" className="size-5" strokeWidth={2.25} /></button>
             </nav>
           )}
-          <div className="max-w-2xl mx-auto min-w-0 flex-1">
-            <h1 className="text-base font-bold text-white">Clark County Digital Equity Assistant</h1>
-            <p className="text-sm text-blue-100">
-              {messages.length > 0 && !showMainMenu && workflow
-                ? workflow.intent === 'plans'
-                  ? 'Find internet plans in Clark County'
-                  : workflow.prompt.includes('devices')
-                    ? 'Find free or low-cost devices in Clark County'
-                    : 'Find digital skills training in Clark County'
-                : 'Look up internet plans & digital resources for a client in Clark County, NV'}
-            </p>
+          <div className="min-w-0 flex-1 basis-0">
+            <h1 className="text-xl sm:text-xl font-semibold tracking-tight text-balance leading-tight">{t('Clark County Digital Equity Assistant')}</h1>
           </div>
+          <div className="order-1 ml-auto shrink-0 sm:order-3"><LanguageToggle /></div>
         </div>
       </header>
 
@@ -679,26 +690,30 @@ export default function Chatbot() {
         resetConfirmed.current = true;
         resetClient(resetAction);
       }} onClosed={() => { if (resetConfirmed.current) focusInput(); else resetFocus.current?.focus(); }} />
-      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">{announcement}</div>
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">{t(announcement)}</div>
       {lastLookup?.validated && (
-        <div className="border-b border-border bg-background text-foreground px-4 py-2">
-          <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
-            <p className="text-sm"><strong>Current address:</strong> {lastLookup.address ?? lastLookup.confirmAddress}</p>
-            <Button variant="outline" disabled={changingAddress || isStreaming || !!pendingConfirm} onClick={startAddressChange}>Change</Button>
+        <div className="border-b border-border bg-card/70 backdrop-blur-sm text-foreground px-4 py-2.5 sm:px-6">
+          <div className="max-w-3xl mx-auto flex items-center justify-between gap-3">
+            <p className="flex items-center gap-2 text-sm min-w-0">
+              <MapPin aria-hidden="true" className="size-4 shrink-0 text-primary" />
+              <span className="text-muted-foreground shrink-0">{t('Current address')}</span>
+              <span className="font-medium truncate">{lastLookup.address ?? lastLookup.confirmAddress}</span>
+            </p>
+            <Button variant="outline" size="sm" className="shrink-0" disabled={changingAddress || isStreaming || !!pendingConfirm} onClick={startAddressChange}>{t('Change')}</Button>
           </div>
         </div>
       )}
       {/* Messages */}
-      <div className="relative flex flex-1 min-h-0 flex-col">
-      <div ref={viewportRef} role="region" aria-label="Conversation" onScroll={() => {
+      <main className="relative flex flex-1 min-h-0 flex-col">
+      <div ref={viewportRef} tabIndex={0} role="region" aria-label={t('Conversation')} onScroll={() => {
         const viewport = viewportRef.current;
         if (!viewport) return;
         nearBottom.current = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 80;
         setShowJump(!nearBottom.current);
-      }} className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
-        <div className="max-w-2xl mx-auto flex flex-col gap-4">
+      }} className="flex-1 min-h-0 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring">
+        <div className="max-w-3xl mx-auto flex flex-col gap-4">
           {messages.length === 0 && (
-            <PromptSuggestions onSelect={selectWorkflow} />
+            <PromptSuggestions onSelect={selectWorkflow} showAbout />
           )}
 
           {messages.map((m, i) => {
@@ -709,19 +724,21 @@ export default function Chatbot() {
 
             return (
               <div key={m.id} data-archived={m.archived || undefined} inert={changingAddress && !m.addressChange} ref={isLastMsg ? guidanceRef : undefined} tabIndex={isLastMsg ? -1 : undefined} className="outline-none">
-                {m.archived && !messages[i - 1]?.archived && <p className="sr-only">Earlier address context — historical only</p>}
-                {!m.archived && messages[i - 1]?.archived && <p className="sr-only">Current address conversation</p>}
-                {m.superseded && <p className="sr-only">Superseded — not used for the current recommendation</p>}
+                {m.archived && !messages[i - 1]?.archived && <p className="sr-only">{t('Earlier address context — historical only')}</p>}
+                {!m.archived && messages[i - 1]?.archived && <p className="sr-only">{t('Current address conversation')}</p>}
+                {m.superseded && <p className="sr-only">{t('Superseded — not used for the current recommendation')}</p>}
                 <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-base leading-relaxed whitespace-pre-wrap ${
+                  <div className={`max-w-[88%] sm:max-w-[85%] px-4 py-3 text-[0.95rem] sm:text-base leading-relaxed whitespace-pre-wrap ${
                     isUser
-                      ? 'bg-blue-600 text-white rounded-br-sm shadow-sm'
-                      : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm shadow-sm'
+                      ? 'bg-primary text-primary-foreground rounded-2xl rounded-br-md shadow-sm'
+                      : 'bg-card border border-border text-card-foreground rounded-2xl rounded-bl-md shadow-sm'
                   }`}>
                     {m.content
-                      ? (isUser ? m.content : <MarkdownContent text={m.content} />)
+                      ? (isUser
+                        ? m.copy ? translateCopy(locale, m.copy) : m.workflowPrompt ? t(m.content) : m.content
+                        : <span lang={m.locale ?? locale}><MarkdownContent text={m.copy ? translateCopy(locale, m.copy) : m.locale ? m.content : t(m.content)} /></span>)
                       : (isStreaming && isLastMsg && !isUser
-                        ? <span aria-hidden="true" className="inline-flex gap-1 text-chat-secondary-foreground">
+                        ? <span aria-hidden="true" className="inline-flex gap-1 text-muted-foreground">
                             <span className="animate-bounce motion-reduce:animate-none" style={{ animationDelay: '0ms' }}>•</span>
                             <span className="animate-bounce motion-reduce:animate-none" style={{ animationDelay: '150ms' }}>•</span>
                             <span className="animate-bounce motion-reduce:animate-none" style={{ animationDelay: '300ms' }}>•</span>
@@ -732,7 +749,8 @@ export default function Chatbot() {
                   </div>
                 </div>
 
-                {m.stopped && <p className="text-sm text-chat-secondary-foreground mt-1">Incomplete — request stopped or interrupted</p>}
+                {!isUser && m.locale && m.locale !== locale && <p className="text-sm text-muted-foreground mt-1.5">{t(m.locale === 'en' ? 'Earlier reply in English' : 'Earlier reply in Spanish')}</p>}
+                {m.stopped && <p className="text-sm text-muted-foreground mt-1.5">{t('Incomplete — request stopped or interrupted')}</p>}
                 {!isUser && !m.archived && m.resultsReady && result && (
                   <div className="mt-1">
                     {result.planGroups && result.intent !== 'services' && (
@@ -778,11 +796,11 @@ export default function Chatbot() {
                     original lookup reply — that message may be long scrolled past. */}
                 {!isUser && !m.stopped && !changingAddress && !pendingConfirm && isLastMsg && !isStreaming && planFlow.step !== 'idle' && (
                   <div className="mt-1">
-                    {planFlow.step.startsWith('awaiting_') && <Button variant="outline" onClick={handleGuidedBack}>Back</Button>}
+                    {planFlow.step.startsWith('awaiting_') && <Button variant="outline" onClick={handleGuidedBack}>{t('Back')}</Button>}
                     {planFlow.step === 'recommended_shown' && (
                       <div className="flex flex-col gap-2 text-foreground py-2">
-                        <p className="text-sm"><strong>Current answers:</strong> {HOUSEHOLD_SIZE_OPTIONS.find(o => o.value === planFlow.householdSize)?.label}; {DEVICE_COUNT_OPTIONS.find(o => o.value === planFlow.deviceCount)?.label}; {USAGE_PROFILE_OPTIONS.find(o => o.value === planFlow.usageProfile)?.label}.</p>
-                        <div><Button variant="outline" onClick={handleGetRecommendation}>Edit answers</Button></div>
+                        <p className="text-sm"><strong>{t('Current answers:')}</strong> {t(HOUSEHOLD_SIZE_OPTIONS.find(o => o.value === planFlow.householdSize)?.label ?? '')}; {t(DEVICE_COUNT_OPTIONS.find(o => o.value === planFlow.deviceCount)?.label ?? '')}; {t(USAGE_PROFILE_OPTIONS.find(o => o.value === planFlow.usageProfile)?.label ?? '')}.</p>
+                        <div><Button variant="outline" onClick={handleGetRecommendation}>{t('Edit answers')}</Button></div>
                       </div>
                     )}
                     {planFlow.step === 'all_shown' && planFlow.planGroups && (
@@ -829,11 +847,11 @@ export default function Chatbot() {
 
                 {!isUser && !m.stopped && !changingAddress && !pendingConfirm && isLastMsg && !isStreaming && serviceFlow.step !== 'idle' && (
                   <div className="mt-1">
-                    {serviceFlow.step === 'awaiting_type' && <Button variant="outline" onClick={() => { setServiceFlow(f => ({ ...f, step: 'top_shown' })); appendAssistantText('Show all resources or choose a resource type.'); }}>Back</Button>}
+                    {serviceFlow.step === 'awaiting_type' && <Button variant="outline" onClick={() => { setServiceFlow(f => ({ ...f, step: 'top_shown' })); appendAssistantText('Show all resources or choose a resource type.'); }}>{t('Back')}</Button>}
                     {serviceFlow.step === 'filtered_shown' && (
                       <div className="flex items-center justify-between gap-2 text-foreground py-2">
-                        <p className="text-sm"><strong>Current resource type:</strong> {serviceFlow.selectedType}</p>
-                        <Button variant="outline" onClick={handleFilterByType}>Edit answers</Button>
+                        <p className="text-sm"><strong>{t('Current resource type:')}</strong> {translateServiceType(locale, serviceFlow.selectedType ?? '')}</p>
+                        <Button variant="outline" onClick={handleFilterByType}>{t('Edit answers')}</Button>
                       </div>
                     )}
                     {serviceFlow.step === 'top_shown' && (
@@ -883,26 +901,28 @@ export default function Chatbot() {
         </div>
       </div>
 
-        {showJump && <div className="absolute right-[max(1.5rem,calc((100%_-_42rem)/2_-_4rem))] bottom-4"><Button variant="outline" size="icon" className="size-12 rounded-full shadow-sm [&_svg]:size-6" aria-label="Jump to latest" title="Jump to latest" onClick={jumpToLatest}><ArrowDown aria-hidden="true" className="animate-pulse motion-reduce:animate-none" /></Button></div>}
-      </div>
+        {showJump && <div className="absolute right-[max(1rem,calc((100%_-_48rem)/2_+_0.5rem))] bottom-4"><Button variant="outline" size="icon" className="size-11 rounded-full bg-card shadow-md [&_svg]:size-5" aria-label={t('Jump to latest')} title={t('Jump to latest')} onClick={jumpToLatest}><ArrowDown aria-hidden="true" className="animate-pulse motion-reduce:animate-none" /></Button></div>}
+      </main>
 
       {/* Input */}
-      <div className="bg-white border-t border-slate-200 px-4 py-3 shrink-0">
-        <div className="max-w-2xl mx-auto">
-          <div ref={composerRef} className="flex flex-col gap-3">
-            {(error || (retryJob && !isStreaming)) && (
-              <div aria-label="Request recovery" className="flex items-center gap-2">
-                {error && <p className="text-sm text-foreground leading-relaxed">{error}</p>}
-                {retryJob && !isStreaming && <Button variant="outline" size="icon" aria-label="Retry" title="Retry" onClick={() => { nearBottom.current = true; void runRequest(retryJob); }}><RotateCcw aria-hidden="true" /></Button>}
+      <div className="bg-card border-t border-border px-4 py-3 sm:px-6 sm:py-4 shrink-0">
+        <div className="max-w-3xl mx-auto">
+          {!atMenu && (
+            <div ref={composerRef} className="flex flex-col gap-3">
+              {(error || (retryJob && !isStreaming)) && (
+                <div aria-label={t('Request recovery')} className="flex items-center gap-2 rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2">
+                  {error && <p className="flex-1 text-sm text-foreground leading-relaxed">{t(error)}</p>}
+                  {retryJob && !isStreaming && <Button variant="outline" size="icon" className="bg-card shrink-0" aria-label={t('Retry')} title={t('Retry')} onClick={() => { nearBottom.current = true; void runRequest(retryJob); }}><RotateCcw aria-hidden="true" /></Button>}
+                </div>
+              )}
+              <div hidden={changingAddress}>
+                <ChatInput key={inputKey} onSend={(text, o) => sendMessage(text, undefined, o)} onDraftChange={setHasDraft} onStop={isStreaming ? stopRequest : undefined} disabled={isStreaming || !!pendingConfirm || changingAddress} />
               </div>
-            )}
-            <div hidden={changingAddress}>
-              <ChatInput key={inputKey} onSend={(text, o) => sendMessage(text, undefined, o)} onDraftChange={setHasDraft} onStop={isStreaming ? stopRequest : undefined} disabled={isStreaming || !!pendingConfirm || changingAddress} />
+              {changingAddress && <ChatInput autoFocus onSend={(text, o) => sendMessage(text, undefined, o)} onDraftChange={setHasDraft} onStop={isStreaming ? stopRequest : undefined} onCancel={cancelAddressChange} disabled={isStreaming || !!pendingConfirm} placeholder="Enter the replacement address, or type @ to search…" />}
             </div>
-            {changingAddress && <ChatInput autoFocus onSend={(text, o) => sendMessage(text, undefined, o)} onDraftChange={setHasDraft} onStop={isStreaming ? stopRequest : undefined} onCancel={cancelAddressChange} disabled={isStreaming || !!pendingConfirm} placeholder="Enter the replacement address, or type @ to search…" />}
-          </div>
-          <p className="text-xs text-chat-secondary-foreground text-center mt-2">
-            For emergencies, call 911. For mental health crisis, call or text 988. For social services, call 211.
+          )}
+          <p className={`text-sm leading-relaxed text-muted-foreground text-center text-balance ${atMenu ? '' : 'mt-2.5'}`}>
+            {t('For emergencies, call 911 · Mental health crisis, call or text 988 · Social services, call 211')}
           </p>
         </div>
       </div>
