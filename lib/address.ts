@@ -232,6 +232,45 @@ export const fuzzyCorrectStreet = async (parsed: ParsedAddress): Promise<ParsedA
   };
 };
 
+// ─── Nearby suggestions ────────────────────────────────────────────────────
+
+// Degrees-per-mile is latitude-independent for lat, and varies with
+// longitude, but at Clark County's latitude (~36N) a flat box of this size
+// comfortably covers a ~10-mile radius without a DB-side geo extension —
+// distances are computed precisely in JS afterward, so the box only needs
+// to be a superset of candidates, not exact.
+const NEARBY_BOX_DEGREES = 0.15;
+
+export interface NearbyPoint { addr: string; city: string; state: string; zip: string; distanceMiles: number }
+
+// Used when a geocoded address has no exact match in the FCC dataset — the
+// nearest known points are cheap, concrete alternatives the user can try
+// instead of guessing at spelling.
+export const findNearbyPoints = async (lat: number, lon: number, limit = 5): Promise<NearbyPoint[]> => {
+  const rows = await sql`
+    SELECT DISTINCT addr, city, state, zip, lat, long FROM points
+    WHERE lat BETWEEN ${lat - NEARBY_BOX_DEGREES} AND ${lat + NEARBY_BOX_DEGREES}
+      AND long BETWEEN ${lon - NEARBY_BOX_DEGREES} AND ${lon + NEARBY_BOX_DEGREES}
+  `;
+  return rows
+    .map(r => ({
+      addr: r.addr, city: r.city, state: r.state, zip: r.zip,
+      distanceMiles: haversineMiles(lat, lon, r.lat, r.long),
+    }))
+    .sort((a, b) => a.distanceMiles - b.distanceMiles)
+    .slice(0, limit);
+};
+
+const haversineMiles = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R    = 3958.8;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a    = Math.sin(dLat / 2) ** 2
+             + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
+             * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
 // ─── Points lookup ─────────────────────────────────────────────────────────
 
 export interface PointsRow {

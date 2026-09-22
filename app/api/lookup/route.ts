@@ -1,4 +1,4 @@
-import { extractAddress, searchPoints, geocodeAddress, formatParsedAddress, fuzzyCorrectStreet } from '@/lib/address';
+import { extractAddress, searchPoints, geocodeAddress, formatParsedAddress, fuzzyCorrectStreet, findNearbyPoints, type NearbyPoint } from '@/lib/address';
 import { parseTechRules, matchPlans, groupPlans, type PlanGroups } from '@/lib/plans';
 import { getServicesNearAddress, nationalServicesOnly, type ServiceGroups } from '@/lib/services-lookup';
 import { createTTLCache } from '@/lib/cache';
@@ -15,6 +15,10 @@ interface LookupResponse {
   // before any plans/resources are shown — distinct from `address`, which
   // only exists once a matching FCC dataset row is found.
   confirmAddress?: string;
+  // Nearest known addresses in the FCC dataset, offered when the geocoded
+  // address itself has no exact record — lets the user pick a close match
+  // instead of guessing at spelling or unit numbers.
+  nearbyAddresses?: NearbyPoint[];
 }
 
 // Keyed by normalized address — avoids re-hitting Postgres and the external
@@ -68,7 +72,8 @@ export async function POST(req: Request) {
   const { lat, lon } = geoResult;
 
   if (!row) {
-    const notFound: LookupResponse = { planGroups: null, serviceGroups: nationalServicesOnly(), found: false, validated: true, lat, lon, confirmAddress };
+    const nearbyAddresses = await findNearbyPoints(lat, lon);
+    const notFound: LookupResponse = { planGroups: null, serviceGroups: nationalServicesOnly(), found: false, validated: true, lat, lon, confirmAddress, nearbyAddresses };
     lookupCache.set(cacheKey, notFound, NOT_FOUND_TTL_MS);
     return Response.json(notFound);
   }

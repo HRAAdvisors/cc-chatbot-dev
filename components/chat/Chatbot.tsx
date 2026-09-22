@@ -53,6 +53,7 @@ interface LookupResult {
   validated?: boolean;
   address?: string;
   confirmAddress?: string;
+  nearbyAddresses?: { addr: string; city: string; state: string; zip: string; distanceMiles: number }[];
   lat?: number;
   lon?: number;
   intent: Intent;
@@ -359,7 +360,11 @@ export default function Chatbot() {
     const instructions = result.validated === false
       ? 'The address could not be validated against OpenStreetMap — it may be misspelled or incomplete. Ask the user to double-check the spelling or add more detail (unit number, cross street, or ZIP). Do not mention plans or resources yet.'
       : !result.found
-      ? `No FCC broadband database record was found for this exact address, so plan matching may be incomplete — let the user know and suggest they double-check the address or try a nearby cross street.${showPlans ? ' Also suggest contacting ISPs directly (Cox, AT&T, CenturyLink, Spectrum serve Clark County).' : ''}`
+      ? `No FCC broadband database record was found for this exact address, so plan matching may be incomplete — let the user know.${
+          result.nearbyAddresses?.length
+            ? ` Offer these nearest known addresses instead, closest first, and ask if any of them is the correct one or close to it: ${result.nearbyAddresses.map(n => `${n.addr}, ${n.city}, ${n.state} ${n.zip} (${n.distanceMiles.toFixed(1)} mi)`).join('; ')}.`
+            : ' Suggest they double-check the address or try a nearby cross street.'
+        }${showPlans ? ' Also suggest contacting ISPs directly (Cox, AT&T, CenturyLink, Spectrum serve Clark County).' : ''}`
       : 'Use ONLY the data above — do not mention or invent any provider, plan, or resource that is not listed.';
 
     const contextBlock = [

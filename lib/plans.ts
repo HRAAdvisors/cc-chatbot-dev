@@ -11,7 +11,15 @@ const plansData = Papa.parse<Record<string, string>>(raw, { header: true, skipEm
 
 export const parseTechRules = (techrules: string): Set<string> => {
   if (!techrules) return new Set();
-  return new Set(techrules.split(';').map(p => p.trim().split(':')[0].trim()).filter(Boolean));
+  const keys = techrules.split(';').map(p => p.trim().split(':')[0].trim()).filter(Boolean);
+  const set = new Set(keys);
+  // The FCC techrules key distinguishes satellite orbit ("Geostationary
+  // Satellite" for Viasat/HughesNet vs. "Non-geostationary Satellite" for
+  // Starlink's LEO constellation), but plans_with_tech.csv labels Starlink's
+  // plans with the generic "Satellite" — add that alias so LEO coverage at
+  // an address still matches Starlink's plan rows.
+  if (keys.includes('Non-geostationary Satellite')) set.add('Satellite');
+  return set;
 };
 
 export const matchPlans = (brandnames: string, techsAtAddress: Set<string>, bldType: string): Plan[] => {
