@@ -24,17 +24,13 @@ interface Props {
 export default function PromptSuggestions({ onSelect, showAbout = false }: Props) {
   const { t } = useLanguage();
   return (
-    <div className="flex flex-col gap-7">
-      <div className="text-center mx-auto">
-        <span className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1 text-sm font-medium text-muted-foreground">
-          {t('Clark County, Nevada')}
-        </span>
-        <h2 className="mt-4 text-3xl sm:text-4xl leading-tight font-semibold tracking-tight text-foreground text-balance">
-          {t('Digital Navigation for Clark County Residents')}
+    <div className="pt-4">
+      <div className="flex flex-col gap-8 sm:gap-10">
+      <div className="flex flex-col gap-[19px]">
+      <div className="text-left">
+        <h2 className="text-2xl sm:text-3xl leading-tight font-semibold tracking-tight text-foreground text-balance">
+          {t('What would you like to find today?')}
         </h2>
-        {/* <p className="mt-3 text-lg leading-relaxed text-muted-foreground text-pretty">
-          {t("Choose a starting point below. I'll use the client's address to show the internet plans and digital-equity resources available to them.")}
-        </p> */}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
@@ -57,9 +53,10 @@ export default function PromptSuggestions({ onSelect, showAbout = false }: Props
           </button>
         ))}
       </div>
+      </div>
 
       {showAbout && (
-        <section aria-labelledby="about-heading" className="mt-3 overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
+        <section aria-labelledby="about-heading" className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
           <div className="grid md:grid-cols-2">
             <div className="relative min-h-56 sm:min-h-72 md:min-h-full">
               <img
@@ -103,6 +100,7 @@ export default function PromptSuggestions({ onSelect, showAbout = false }: Props
           </div>
         </section>
       )}
+      </div>
     </div>
   );
 }

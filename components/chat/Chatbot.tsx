@@ -4,6 +4,7 @@ import { nanoid } from 'nanoid';
 import { ArrowDown, House, MapPin, RefreshCw, RotateCcw } from 'lucide-react';
 import ChatInput, { type SendOptions } from './ChatInput';
 import ResetConfirmation from './ResetConfirmation';
+import SessionTimeout from './SessionTimeout';
 import { LanguageToggle, useLanguage } from './LanguageProvider';
 import { translateCopy, translateServiceType, type Locale, type MessageCopy } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
@@ -343,6 +344,11 @@ export default function Chatbot() {
     setAnnouncement('Conversation cleared. Choose one of the three options.');
     focusInput();
   }, [invalidateRequest, focusInput]);
+  const endIdleSession = useCallback(() => {
+    resetClient();
+    setAnnouncement('Session ended. Client details cleared from this screen.');
+    requestAnimationFrame(() => viewportRef.current?.querySelector<HTMLButtonElement>('button')?.focus());
+  }, [resetClient]);
   const requestReset = useCallback(() => {
     const skipConfirmation = skipResetConfirmation || document.cookie.split('; ').includes('cc-skip-reset-confirmation=1');
     if (!skipConfirmation && (messages.length || hasDraft || lastLookup || isStreaming || changingAddress)) {
@@ -647,13 +653,24 @@ export default function Chatbot() {
   const closingLine = "Let me know if you need anything else for this case.";
 
   const handleBackToMenu = useCallback(() => {
+    if (activeJob.current) stopRequest();
     setPlanFlow(IDLE_PLAN_FLOW);
     setServiceFlow(IDLE_SERVICE_FLOW);
     setPendingConfirm(null);
+    setChangingAddress(false);
+    setError(null);
+    setRetryJob(null);
     setShowMainMenu(true);
+    setShowJump(false);
     nearBottom.current = true;
-    setAnnouncement('Back to the main menu. The conversation is still here — choose a new topic to continue.');
-  }, []);
+    setAnnouncement('Back to Home. Choose a topic to continue with this client.');
+    requestAnimationFrame(() => {
+      const viewport = viewportRef.current;
+      if (!viewport) return;
+      viewport.scrollTop = 0;
+      viewport.querySelector<HTMLButtonElement>('button')?.focus();
+    });
+  }, [stopRequest]);
 
   const handleSeeAllPlans = useCallback(() => {
     appendAssistantText(`Here are all the internet plans available at the client's address. ${closingLine}`, { key: "Here are all the internet plans available at the client's address.", suffix: closingLine });
@@ -748,6 +765,7 @@ export default function Chatbot() {
         </div>
       </header>
 
+      {(messages.length > 0 || hasDraft || lastLookup) && <SessionTimeout key={inputKey} onExpire={endIdleSession} />}
       <ResetConfirmation open={resetAction} dontShowAgain={dontShowResetAgain} onDontShowAgainChange={setDontShowResetAgain} onCancel={() => setResetAction(false)} onConfirm={() => {
         if (!resetAction) return;
         if (dontShowResetAgain) {
@@ -758,7 +776,7 @@ export default function Chatbot() {
         resetClient();
       }} onClosed={() => { if (resetConfirmed.current) focusInput(); else resetFocus.current?.focus(); }} />
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">{t(announcement)}</div>
-      {lastLookup?.validated && (
+      {!atMenu && lastLookup?.validated && (
         <div className="border-b border-border bg-card/70 backdrop-blur-sm text-foreground px-4 py-2.5 sm:px-6">
           <div className="max-w-3xl mx-auto flex items-center justify-between gap-3">
             <p className="flex items-center gap-2 text-sm min-w-0">
@@ -779,11 +797,11 @@ export default function Chatbot() {
         setShowJump(!nearBottom.current);
       }} className="flex-1 min-h-0 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring">
         <div className="max-w-3xl mx-auto flex flex-col gap-4">
-          {messages.length === 0 && (
+          {atMenu && (
             <PromptSuggestions onSelect={selectWorkflow} showAbout />
           )}
 
-          {messages.map((m, i) => {
+          {!atMenu && messages.map((m, i) => {
             const isUser = m.role === 'user';
             const isLastMsg = i === messages.length - 1;
             const resultKey = isUser ? m.id : (messages[i - 1]?.id ?? '');
@@ -978,18 +996,13 @@ export default function Chatbot() {
                   </div>
                 )}
 
-                {!isUser && isLastMsg && !isStreaming && showMainMenu && (
-                  <div className="mt-1">
-                    <PromptSuggestions onSelect={selectWorkflow} />
-                  </div>
-                )}
               </div>
             );
           })}
         </div>
       </div>
 
-        {showJump && <div className="absolute right-[max(1rem,calc((100%_-_48rem)/2_+_0.5rem))] bottom-4"><Button variant="outline" size="icon" className="size-11 rounded-full bg-card shadow-md [&_svg]:size-5" aria-label={t('Jump to latest')} title={t('Jump to latest')} onClick={jumpToLatest}><ArrowDown aria-hidden="true" className="animate-pulse motion-reduce:animate-none" /></Button></div>}
+        {!atMenu && showJump && <div className="absolute right-[max(1rem,calc((100%_-_48rem)/2_+_0.5rem))] bottom-4"><Button variant="outline" size="icon" className="size-11 rounded-full bg-card shadow-md [&_svg]:size-5" aria-label={t('Jump to latest')} title={t('Jump to latest')} onClick={jumpToLatest}><ArrowDown aria-hidden="true" className="animate-pulse motion-reduce:animate-none" /></Button></div>}
       </main>
 
       {/* Input */}
