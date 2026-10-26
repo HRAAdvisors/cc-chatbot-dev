@@ -27,7 +27,7 @@ graph TB
 
     subgraph Data["Static / bundled data"]
         CSV["public/plans_with_tech.csv"]
-        Services["lib/services.ts\n(108 hardcoded records)"]
+        Services["lib/services.ts\n(111 hardcoded records)"]
     end
 
     subgraph External["External services"]
@@ -101,7 +101,7 @@ There is no RPC, message queue, or network hop between "services" — they commu
 | Neon Postgres | `DATABASE_URL` env var, client in [lib/db.ts](lib/db.ts) | `points` table: address-level FCC/BDC broadband availability (`addr, city, state, zip, bld_type, brandnames, techbest, techrules, max_dl, max_ul, fixedcnt, cschoice, lat, long`) — also used to backfill map coordinates for `chat_logs` rows logged before the fix below (see [lib/dashboard-data.ts](lib/dashboard-data.ts) `getEnrichedChatLogs()`, which re-splits `address_queried` and joins back to `points`). `chat_logs` table: per-message analytics (`id, session_id, created_at, user_message, intent, address_queried, lat, long, num_plans_returned, num_services_returned, household_size, usage_profile, device_count, service_type_selected`). | ⚠️ No migration files or schema-definition scripts exist in this repo. Both tables must already exist on the Neon instance — they were provisioned out-of-band. |
 | Bundled GeoJSON | [public/commissioner_districts.geojson](public/commissioner_districts.geojson) | Clark County commissioner district boundaries (7 polygons, districts A–G), converted from a county-supplied shapefile. Loaded by [lib/districts.ts](lib/districts.ts) for the admin dashboard's district filter/point-in-polygon test. | Static; re-derive from an updated shapefile via `ogr2ogr -f GeoJSON -t_srs EPSG:4326` if district boundaries ever change. |
 | Bundled CSV | [public/plans_with_tech.csv](public/plans_with_tech.csv) | ISP plan catalog (provider, price, speeds, data cap, contract terms, low-income discount, etc.). | Loaded synchronously at module-init via `fs.readFileSync` + Papaparse in [lib/plans.ts](lib/plans.ts). Baked into the deployed build — updating plans means editing/redeploying this file, not a DB write. |
-| Hardcoded TS array | [lib/services.ts](lib/services.ts) | 108 digital-equity resource records (73 local Clark County/Las Vegas orgs + 35 national programs). Per its header comment, generated from `digital_inclusion_resources_claude enhanced.xlsx`. | Same as above — code change + redeploy to update. |
+| Hardcoded TS array | [lib/services.ts](lib/services.ts) | 111 digital-equity resource records (73 local Clark County/Las Vegas orgs + 38 national programs, including 3 retailer entries). Per its header comment, generated from `digital_inclusion_resources_claude enhanced.xlsx`. | Same as above — code change + redeploy to update. |
 
 **Fixed:** `chat_logs.lat`/`long` used to always be `NULL` — [app/api/chat/route.ts](app/api/chat/route.ts) called `logChat()` synchronously right after *firing* (not awaiting) the Nominatim geocode, so the insert always ran before the coordinates resolved. It now chains the DB write onto the geocode promise instead, so new rows get real coordinates without blocking the streamed chat response.
 
@@ -245,7 +245,7 @@ lib/
 ├── address.ts          # Address extraction + Nominatim geocoding + points lookup
 ├── plans.ts             # CSV plan loading/matching
 ├── plan-utils.ts        # Plan/PlanGroups types, household/device/usage options, recommendPlan()
-├── services.ts          # Static digital-equity resource data (108 records)
+├── services.ts          # Static digital-equity resource data (111 records)
 ├── services-lookup.ts   # Haversine distance grouping
 ├── dashboard-data.ts     # Admin: one chat_logs fetch + filters + all chart/session aggregation
 ├── districts.ts          # Admin: commissioner district point-in-polygon

@@ -116,7 +116,7 @@ export default function ServicesTable({ serviceGroups, initialTypeFilter }: Prop
       <SortableTable
         columns={columns}
         rows={sorted}
-        rowKey={s => `${s.name}-${s.tier}-${s.address}`}
+        rowKey={s => `${s.name}-${s.type}-${s.tier}-${s.address}-${s.url}`}
         sort={sort}
         onSortChange={handleSortChange}
         emptyMessage="No resources match your filters."

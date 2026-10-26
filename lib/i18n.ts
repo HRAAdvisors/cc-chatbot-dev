@@ -99,7 +99,7 @@ export const spanish: Record<string, string> = {
   'Basic — browsing, email, video calls': 'Básico: navegar, correo y videollamadas', 'Streaming & remote work': 'Videos y trabajo a distancia',
   'Heavy use — gaming, smart home, many devices': 'Uso intensivo: videojuegos, hogar inteligente y muchos dispositivos',
   'Digital Skills Training': 'Capacitación en habilidades digitales', 'Device Access Resources': 'Acceso a dispositivos',
-  'Workforce Programming': 'Programas de empleo', 'Affordability / Connectivity': 'Accesibilidad económica / Conectividad', 'Navigation / Referral': 'Orientación / Derivación',
+  'Workforce Programming': 'Programas de empleo', 'Affordability / Connectivity': 'Accesibilidad económica / Conectividad', 'Navigation / Referral': 'Orientación / Derivación', 'Low-Cost Retail Options': 'Opciones de venta al por menor a bajo costo',
   'Unknown': 'Desconocida', 'Unknown technology': 'Tecnología desconocida', 'Fixed wireless': 'Internet inalámbrico fijo',
   'Fiber': 'Fibra óptica', 'Fiber Optic': 'Fibra óptica', 'Cable': 'Cable', 'Satellite': 'Satélite', 'Fixed Wireless': 'Internet inalámbrico fijo',
   'Digital Equity Resources': 'Recursos de inclusión digital', 'Recommended plan': 'Plan recomendado', 'Internet plans available': 'Planes de internet disponibles',
