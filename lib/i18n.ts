@@ -90,7 +90,6 @@ export const spanish: Record<string, string> = {
   'Household: {value}': 'Hogar: {value}', 'Connected devices: {value}': 'Dispositivos conectados: {value}',
   'Internet use: {value}': 'Uso de internet: {value}', 'Resource type: {value}': 'Tipo de recurso: {value}',
   'Here are the {type} resources near this address.': 'Estos son los recursos de {type} cerca de esta dirección.',
-  "A quick note: this list isn't influenced by search engine optimization, advertising, or paid placement — plans are shown based on availability data only.": 'Nota: esta lista no está influida por el posicionamiento en buscadores, la publicidad ni los pagos por aparecer. Los planes se muestran solo según los datos de disponibilidad.',
   'Earlier address context — historical only': 'Dirección anterior, solo como referencia histórica',
   'Current address conversation': 'Conversación de la dirección actual', 'Superseded — not used for the current recommendation': 'Reemplazado, no se usa en la recomendación actual',
   'Incomplete — request stopped or interrupted': 'Incompleto, solicitud detenida o interrumpida',
@@ -131,6 +130,7 @@ export const spanish: Record<string, string> = {
   'Phone: {phone}': 'Teléfono: {phone}', 'Address: {address}': 'Dirección: {address}', 'Info: {url}': 'Información: {url}',
   'View original (English)': 'Ver original (inglés)', 'Spanish translation unavailable. Original in English:': 'Traducción al español no disponible. Original en inglés:',
   'Earlier reply in English': 'Respuesta anterior en inglés', 'Earlier reply in Spanish': 'Respuesta anterior en español',
+  "*Note: plans are listed by availability only, not advertising or paid placement. Providers may require a bank account, photo ID, proof of age or address, or limit one account per household, and low-income programs may require proof of benefits. Confirm requirements with the provider before signup.*": '*Nota: los planes se muestran solo según disponibilidad, sin publicidad ni pagos por aparecer. Los proveedores pueden exigir cuenta bancaria, identificación con foto, comprobante de edad o domicilio, o limitar una cuenta por hogar, y los programas para bajos ingresos pueden exigir comprobante de beneficios. Confirme los requisitos con el proveedor antes de inscribirse.*',
 };
 
 export function translate(locale: Locale, key: string, values: TranslationValues = {}): string {

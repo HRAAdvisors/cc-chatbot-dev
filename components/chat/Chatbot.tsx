@@ -239,7 +239,7 @@ function localReply(job: Pick<RequestJob, 'result' | 'intent'>): MessageCopy {
   return { key: showPlans ? "Here are the internet plans available at the client's address." : 'Here are the digital equity resources near this address.' };
 }
 
-const PLAN_DISCLAIMER = "A quick note: this list isn't influenced by search engine optimization, advertising, or paid placement — plans are shown based on availability data only.";
+const PLAN_DISCLAIMER = "*Note: plans are listed by availability only, not advertising or paid placement. Providers may require a bank account, photo ID, proof of age or address, or limit one account per household, and low-income programs may require proof of benefits. Confirm requirements with the provider before signup.*";
 
 // Fire-and-forget: these selections happen entirely client-side (no /api/chat
 // call necessarily follows), so they're posted to their own endpoint rather
