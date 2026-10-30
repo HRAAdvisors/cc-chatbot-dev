@@ -5,6 +5,8 @@ import { ArrowDown, House, MapPin, RefreshCw, RotateCcw } from 'lucide-react';
 import ChatInput, { type SendOptions } from './ChatInput';
 import ResetConfirmation from './ResetConfirmation';
 import SessionTimeout from './SessionTimeout';
+import ChatExport from './ChatExport';
+import type { ChatExportData } from '@/lib/chat-export';
 import { LanguageToggle, useLanguage } from './LanguageProvider';
 import { translateCopy, translateServiceType, type Locale, type MessageCopy } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
@@ -43,6 +45,7 @@ interface Message {
   suppressResults?: boolean;
   resultsReady?: boolean;
   addressChange?: boolean;
+  exportRecords?: string[];
 }
 
 type Intent = PromptIntent | 'both';
@@ -624,11 +627,11 @@ export default function Chatbot() {
     focusInput();
   }, [invalidateRequest, focusInput]);
 
-  const recordAnswer = useCallback((answerKey: NonNullable<Message['answerKey']>, content: string, role: Message['role'] = 'user', copy?: MessageCopy) => {
+  const recordAnswer = useCallback((answerKey: NonNullable<Message['answerKey']>, content: string, role: Message['role'] = 'user', copy?: MessageCopy, exportRecords?: string[]) => {
     setRetryJob(null);
     setError(null);
     nearBottom.current = true;
-    setMessages(prev => [...prev.map(m => !m.archived && m.answerKey === answerKey && m.role === role ? { ...m, superseded: true } : m), { id: nanoid(), role, content, answerKey, copy }]);
+    setMessages(prev => [...prev.map(m => !m.archived && m.answerKey === answerKey && m.role === role ? { ...m, superseded: true } : m), { id: nanoid(), role, content, answerKey, copy, exportRecords }]);
     setAnnouncement(copy ? translateCopy(localeRef.current, copy) : content);
   }, [localeRef]);
   const invalidateAnswers = useCallback((keys: Array<NonNullable<Message['answerKey']>>) => {
@@ -711,7 +714,7 @@ export default function Chatbot() {
       : "No matching plan was found for this address.";
     const label = USAGE_PROFILE_OPTIONS.find(o => o.value === usage)!.label;
     recordAnswer('usage', `Internet use: ${label}`, 'user', { key: 'Internet use: {value}', values: { value: label } });
-    recordAnswer('recommendation', `${intro} ${closingLine}`, 'assistant', { key: intro, suffix: closingLine });
+    recordAnswer('recommendation', `${intro} ${closingLine}`, 'assistant', { key: intro, suffix: closingLine }, plan ? [describePlan(plan)] : []);
     setPlanFlow(f => ({
       ...f,
       usageProfile: usage,
@@ -746,6 +749,44 @@ export default function Chatbot() {
   // landing screen and the main menu, the cards (and in-section filters) drive
   // navigation, so the composer is hidden there.
   const atMenu = messages.length === 0 || showMainMenu;
+
+  const getExportData = (): ChatExportData => ({
+    query: workflow ? t(workflow.prompt) : undefined,
+    address: lastLookup?.validated ? lastLookup.address ?? lastLookup.confirmAddress : undefined,
+    referrals: serviceFlow.step !== 'idle' && serviceFlow.serviceGroups
+      ? SERVICE_TIERS.flatMap(([tier]) => serviceFlow.serviceGroups![tier])
+        .filter(service => serviceFlow.step !== 'filtered_shown' || service.type.split(',').map(type => type.trim()).includes(serviceFlow.selectedType ?? ''))
+        .map(service => [describeService(service), service.address, service.url].filter(Boolean).join(' | '))
+      : planFlow.step !== 'idle' && planFlow.planGroups
+        ? flattenPlans(planFlow.planGroups).map(describePlan)
+        : undefined,
+    recommendation: planFlow.step === 'recommended_shown' && planFlow.recommendedPlan
+      ? [describePlan(planFlow.recommendedPlan), planFlow.recommendationNote ? t(planFlow.recommendationNote) : ''].filter(Boolean).join('\n')
+      : undefined,
+    messages: messages.map((m, index) => {
+      const result = m.role === 'assistant' && m.resultsReady ? resultMap.get(messages[index - 1]?.id ?? '') : undefined;
+      const records: string[] = [...(m.exportRecords ?? [])];
+      if (result?.planGroups && result.intent !== 'services') {
+        records.push(...flattenPlans(result.planGroups).map(describePlan));
+      }
+      if (result?.serviceGroups && result.intent !== 'plans') {
+        for (const [tier] of SERVICE_TIERS) {
+          records.push(...result.serviceGroups[tier].map(service => [describeService(service), service.address, service.url].filter(Boolean).join(' | ')));
+        }
+      }
+      return {
+        role: m.role,
+        text: m.copy ? translateCopy(locale, m.copy) : m.role === 'user' ? (m.workflowPrompt ? t(m.content) : m.content) : m.locale ? m.content : t(m.content),
+        archived: m.archived,
+        superseded: m.superseded,
+        stopped: m.stopped,
+        answerKey: m.answerKey,
+        workflowPrompt: m.workflowPrompt,
+        address: result?.address,
+        records: result || m.exportRecords ? records : undefined,
+      };
+    }),
+  });
 
   return (
     <div className="flex flex-col h-dvh bg-background">
@@ -788,6 +829,7 @@ export default function Chatbot() {
           </div>
         </div>
       )}
+      {messages.length > 0 && <ChatExport key={inputKey} getData={getExportData} disabled={isStreaming || changingAddress || !!pendingConfirm} />}
       {/* Messages */}
       <main className="relative flex flex-1 min-h-0 flex-col">
       <div ref={viewportRef} tabIndex={0} role="region" aria-label={t('Conversation')} onScroll={() => {
