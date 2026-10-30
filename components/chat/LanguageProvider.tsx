@@ -30,7 +30,7 @@ export function LanguageProvider({ children, initialLocale }: { children: ReactN
 
 export function useLanguage() { return useContext(LanguageContext); }
 
-export function LanguageToggle() {
+export function LanguageToggle({ tone = 'inverse' }: { tone?: 'inverse' | 'neutral' }) {
   const { locale, setLocale, t } = useLanguage();
   return (
     <select
@@ -41,7 +41,7 @@ export function LanguageToggle() {
         const next = event.target.value;
         if (next === 'en' || next === 'es') setLocale(next);
       }}
-      className="min-h-11 cursor-pointer rounded-md border-0 bg-transparent px-2 py-2 text-base font-normal text-primary-foreground transition-colors hover:text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-foreground"
+      className={`min-h-11 cursor-pointer rounded-lg border-0 px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${tone === 'neutral' ? 'bg-muted text-foreground hover:bg-accent focus-visible:outline-ring' : 'bg-transparent text-primary-foreground hover:text-primary-foreground focus-visible:outline-primary-foreground'}`}
     >
       <option value="en" lang="en" className="bg-popover text-popover-foreground">English</option>
       <option value="es" lang="es" className="bg-popover text-popover-foreground">Español</option>

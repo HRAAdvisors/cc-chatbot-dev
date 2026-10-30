@@ -11,11 +11,11 @@ const publicSans = Public_Sans({
 export const metadata: Metadata = {
   title: "Clark County Digital Equity Assistant",
   description:
-    "Find internet plans and digital inclusion resources for Clark County, Nevada. Available in English and Spanish. Disponible en inglés y español.",
+    "Search an address or ask a question about internet plans, device access, and digital skills training in Clark County, Nevada. Explore resources together and share a client shortlist in English or Spanish.",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1a3e8c",
+  themeColor: "#f4f6fa",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
