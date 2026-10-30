@@ -410,6 +410,135 @@
   --sidebar-ring: var(--ring);
 }
 
+.resource-finder {
+  --background: #f4f6fa;
+  --foreground: #1d2c44;
+  --primary: #1e5cc3;
+  --resource: #187043;
+  --skills: #b84d0e;
+  --primary-foreground: #ffffff;
+  --card: #ffffff;
+  --card-foreground: var(--foreground);
+  --muted: var(--background);
+  --muted-foreground: color-mix(in srgb, var(--foreground) 73%, var(--card));
+  --secondary: var(--background);
+  --secondary-foreground: var(--foreground);
+  --accent: color-mix(in srgb, var(--primary) 7%, var(--card));
+  --accent-foreground: var(--primary);
+  --border: color-mix(in srgb, var(--foreground) 12%, var(--card));
+  --input: color-mix(in srgb, var(--foreground) 20%, var(--card));
+  --ring: var(--primary);
+}
+
+.finder-header {
+  --ring: var(--primary-foreground);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--foreground) 4%, transparent);
+}
+
+.finder-search-panel {
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--card));
+  border-radius: 1.25rem;
+  background: var(--card);
+  color: var(--card-foreground);
+  box-shadow: 0 8px 0 -3px var(--accent), 0 18px 40px -20px color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.resource-finder [data-category] {
+  --topic: var(--primary);
+  --topic-muted: color-mix(in srgb, var(--topic) 14%, var(--card));
+  --topic-surface: var(--topic);
+  --topic-foreground: var(--primary-foreground);
+}
+.resource-finder [data-category="devices"] { --topic: var(--resource); }
+.resource-finder [data-category="skills"] { --topic: var(--skills); }
+.finder-categories { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; }
+.finder-category {
+  display: flex;
+  flex-direction: column;
+  border-radius: 1rem;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--topic) 20%, var(--card));
+  background: var(--card);
+  color: var(--card-foreground);
+  box-shadow: 0 4px 12px -6px color-mix(in srgb, var(--foreground) 20%, transparent);
+  transition: border-color .15s, box-shadow .15s;
+}
+.finder-category:hover { border-color: var(--topic); box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--topic) 25%, transparent); }
+.finder-category-top { display: flex; align-items: center; justify-content: space-between; gap: .75rem; color: var(--topic); }
+.finder-category-count { font-size: 1.75rem; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.finder-category-label { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding-top: .75rem; color: inherit; font-size: .875rem; line-height: 1.5; font-weight: 500; }
+.finder-category[data-empty="true"] { box-shadow: none; }
+.finder-handoff { border: 1px solid color-mix(in srgb, var(--primary) 16%, var(--card)); border-radius: 1.25rem; background: var(--accent); color: var(--foreground); }
+.resource-card { box-shadow: 0 5px 16px -8px color-mix(in srgb, var(--foreground) 20%, transparent); }
+.finder-resource-section[data-category="devices"],
+.finder-resource-section[data-category="skills"] {
+  --primary: var(--topic);
+  --accent: color-mix(in srgb, var(--topic) 7%, var(--card));
+  --accent-foreground: var(--topic);
+  --ring: var(--topic);
+}
+.finder-resource-section h2 { padding: .875rem 1.25rem; border-radius: .75rem; background: var(--topic-surface); color: var(--topic-foreground); }
+.finder-resource-section .resource-card [data-slot="card-header"] {
+  background: var(--topic-muted);
+  color: var(--card-foreground);
+  padding-block: var(--card-spacing);
+  margin-top: calc(-1 * var(--card-spacing));
+}
+.finder-with-chat { padding-bottom: calc(7rem + env(safe-area-inset-bottom)); }
+.finder-chat-dock { position: fixed; z-index: 20; bottom: max(1rem, env(safe-area-inset-bottom)); inset-inline: 0; width: min(100%, 64rem); margin-inline: auto; padding-inline: 1.25rem; }
+.finder-chat-composer { padding: .5rem; border-radius: 1.25rem; background: var(--card); color: var(--card-foreground); box-shadow: 0 8px 40px color-mix(in srgb, var(--foreground) 12%, transparent); }
+.finder-page-conversation { padding-block: 1.5rem; border-top: 1px dashed var(--border); }
+.finder-page-conversation [data-slot="message-header"] { font-size: .875rem; }
+/* Inline replies grow with the document instead of creating a nested chat viewport. */
+.finder-page-conversation :is([data-slot="message-scroller"], [data-slot="message-scroller-viewport"]) { height: auto; overflow: visible; contain: none; mask-image: none; overscroll-behavior: auto; }
+.finder-page-conversation [data-slot="message-scroller-content"] { min-height: 0; }
+.finder-page-conversation [data-slot="message-scroller-item"] { content-visibility: visible; contain-intrinsic-size: none; scroll-margin-top: 2rem; }
+@media (min-width: 640px) { .finder-chat-dock { padding-inline: 2rem; } }
+@media (max-width: 519px) {
+  .finder-categories { grid-template-columns: 1fr; }
+  .finder-category { flex-direction: row; align-items: center; padding: .875rem 1rem; }
+  .finder-category-top { min-width: 4rem; }
+  .finder-category-count { font-size: 1.25rem; }
+  .finder-category-label { flex: 1; padding-top: 0; padding-left: 1rem; }
+}
+@media (prefers-reduced-motion: reduce) { .finder-category { transition: none; } }
+
+.resource-card[data-selected="true"] {
+  --tw-ring-color: color-mix(in srgb, var(--primary) 35%, var(--card));
+}
+
+.resource-card[data-selected="true"] [data-slot="card-footer"] {
+  background: var(--accent);
+  color: var(--foreground);
+  border-color: color-mix(in srgb, var(--primary) 18%, var(--card));
+}
+
+.resource-finder [data-slot="button"] {
+  min-height: 2.5rem;
+  font-size: 0.875rem;
+}
+
+.resource-finder :is(a, button, summary, input):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+select:not([multiple]):not([size]) {
+  appearance: none;
+  padding-right: 2.5rem;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 1rem) center, calc(100% - .75rem) center;
+  background-size: .25rem .25rem;
+  background-repeat: no-repeat;
+}
+
+@media (forced-colors: active) {
+  select:not([multiple]):not([size]) {
+    appearance: auto;
+    background-image: none;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

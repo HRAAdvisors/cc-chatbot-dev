@@ -51,8 +51,9 @@ test('unknown locale catalog entries preserve original source text', () => {
 });
 
 test('literal UI translation calls always have a catalog entry', () => {
-  for (const filename of readdirSync(new URL('../components/chat/', import.meta.url)).filter(name => name.endsWith('.tsx'))) {
-    const source = readFileSync(new URL(`../components/chat/${filename}`, import.meta.url), 'utf8');
+  for (const directory of ['chat', 'resources']) {
+  for (const filename of readdirSync(new URL(`../components/${directory}/`, import.meta.url)).filter(name => name.endsWith('.tsx'))) {
+    const source = readFileSync(new URL(`../components/${directory}/${filename}`, import.meta.url), 'utf8');
     const ast = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     function visit(node) {
       if (ts.isCallExpression(node) && node.expression.getText(ast) === 't' && ts.isStringLiteral(node.arguments[0])) {
@@ -62,5 +63,6 @@ test('literal UI translation calls always have a catalog entry', () => {
       ts.forEachChild(node, visit);
     }
     visit(ast);
+  }
   }
 });
