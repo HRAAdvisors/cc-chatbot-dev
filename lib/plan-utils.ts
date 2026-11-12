@@ -123,6 +123,24 @@ export const toNumber = (s: string): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+export function speedUseGuidance(download: string, upload: string): string | null {
+  const down = toNumber(download);
+  const up = toNumber(upload);
+  if (down === null || down <= 0) return null;
+  if (down < 10) return 'Best suited to email and light browsing on one device.';
+  if (down < 25) return 'Good for browsing and light streaming on one or two devices.';
+  if (down < 100) return up !== null && up >= 5
+    ? 'Good for HD streaming, video calls, and everyday use on a few devices.'
+    : 'Good for HD streaming and everyday browsing. Check upload speed for video calls.';
+  if (down < 300) return up !== null && up >= 5
+    ? 'Good for 4K streaming, video calls, and working from home on several devices.'
+    : 'Good for 4K streaming and larger downloads. Check upload speed for video calls.';
+  if (down < 1000) return up !== null && up >= 10
+    ? 'Good for several people streaming and taking video calls at the same time.'
+    : 'Good for streaming and downloads on several devices. Check upload speed for simultaneous calls.';
+  return 'Good for a busy household with many devices and large downloads.';
+}
+
 export const flattenPlans = (planGroups: PlanGroups): Plan[] => [
   ...planGroups.threshold,
   ...Object.values(planGroups.byProvider).flat(),
