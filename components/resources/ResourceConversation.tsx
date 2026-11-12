@@ -5,13 +5,12 @@ import { useLanguage } from "@/components/chat/LanguageProvider";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
-import { Wifi } from "lucide-react";
 import { Message, MessageContent } from "@/components/ui/message";
 import { MessageScrollerProvider, MessageScroller, MessageScrollerContent, MessageScrollerItem, MessageScrollerViewport } from "@/components/ui/message-scroller";
 import type { useResourceChat } from "./useResourceChat";
 
 export function AssistantLabel() {
-  return <span className="bace-assistant-head"><span className="bace-avatar" aria-hidden="true"><Wifi className="size-3.5" /></span>BACE Hub</span>;
+  return <span className="bace-assistant-head">BACE Hub</span>;
 }
 
 function ReplyText({ text }: { text: string }) {

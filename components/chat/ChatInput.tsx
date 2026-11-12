@@ -47,6 +47,7 @@ interface ChatInputProps {
   initialValue?: string;
   onValueChange?: (value: string) => void;
   hideSubmit?: boolean;
+  clearable?: boolean;
   inputId?: string;
 }
 type SearchState = 'idle' | 'short' | 'loading' | 'success' | 'empty' | 'unavailable' | 'outside';
@@ -57,7 +58,7 @@ const DEBOUNCE_MS = 150;
 const CLARK_PROXIMITY = '-115.1398,36.1699';
 const CLARK_BBOX = '-115.9,35.0,-114.0,36.85';
 
-export default function ChatInput({ onSend, disabled, onDraftChange, placeholder = 'Enter an address or ask a question…', autoFocus, onStop, onCancel, addressOnly = false, spacious = false, initialValue = '', onValueChange, hideSubmit = false, inputId }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, onDraftChange, placeholder = 'Enter an address or ask a question…', autoFocus, onStop, onCancel, addressOnly = false, spacious = false, initialValue = '', onValueChange, hideSubmit = false, clearable = false, inputId }: ChatInputProps) {
   const { t } = useLanguage();
   const [value, setValue] = useState(initialValue);
   const valueRef = useRef(initialValue);
@@ -97,6 +98,16 @@ export default function ChatInput({ onSend, disabled, onDraftChange, placeholder
     return () => document.removeEventListener('mousedown', close);
   }, [dismiss]);
 
+  const clear = () => {
+    invalidate();
+    selectedText.current = null;
+    updateValue('');
+    setSuggestions([]);
+    setActiveIndex(0);
+    setOpen(false);
+    setState('idle');
+    inputRef.current?.focus();
+  };
   const change = (text: string) => {
     invalidate();
     selectedText.current = null;
@@ -232,6 +243,7 @@ export default function ChatInput({ onSend, disabled, onDraftChange, placeholder
           className={cn('min-w-0 flex-1 rounded-xl border border-input px-4 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent disabled:opacity-50', addressOnly || spacious ? 'bg-background/60 py-5' : 'bg-card py-2.5')} />
         {!value && <span className="bace-input-placeholder" aria-hidden="true">{t(placeholder)}</span>}
         </div>
+        {clearable && value && !disabled && <button type="button" aria-label={t('Clear address')} title={t('Clear address')} onClick={clear} className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X aria-hidden="true" size={18} /></button>}
         {onCancel && <button type="button" aria-label={t('Cancel address change')} title={t('Cancel address change')} onClick={onCancel} className="flex size-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring transition-colors"><X aria-hidden="true" size={20} /></button>}
         {!hideSubmit && <button type={onStop ? "button" : "submit"} aria-label={t(onStop ? 'Stop' : addressOnly ? 'Find resources' : 'Send message')} title={t(onStop ? 'Stop' : addressOnly ? 'Find resources' : 'Send message')} onClick={onStop} disabled={!onStop && (disabled || !value.trim())} className={`shrink-0 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-40 flex items-center justify-center transition-colors motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${addressOnly ? 'h-14 px-4' : 'size-11'}`}>
           {onStop ? <Square aria-hidden="true" size={18} className="fill-current" /> : addressOnly ? <span className="flex items-center gap-2 text-sm font-medium">{disabled ? <Loader2 aria-hidden="true" size={16} className="animate-spin motion-reduce:animate-none" /> : null}{t('Find resources')}{!disabled && <ArrowRight aria-hidden="true" size={16} />}</span> : <ArrowRight aria-hidden="true" size={20} />}

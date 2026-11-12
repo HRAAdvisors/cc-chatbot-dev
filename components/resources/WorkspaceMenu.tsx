@@ -9,9 +9,9 @@ import { useOpenResourceMap } from "./ResourceMapLink";
 import type { ResourceMapSession } from "./useResourceMapSession";
 import type { PanelView } from "./WorkspacePanel";
 
-export default function WorkspaceMenu({ hasResults, shareCount, snapshot, mapDisabled, onOpen, onReset }: {
+export default function WorkspaceMenu({ hasResults, shareCount, snapshot, mapDisabled, onOpen, onReset, showMap = false }: {
   hasResults: boolean; shareCount: number; snapshot: ResourceMapSession; mapDisabled: boolean;
-  onOpen: (view: PanelView, opener: HTMLElement | null) => void; onReset?: () => void;
+  onOpen: (view: PanelView, opener: HTMLElement | null) => void; onReset?: () => void; showMap?: boolean;
 }) {
   const { t } = useLanguage();
   const trigger = useRef<HTMLButtonElement>(null);
@@ -25,7 +25,7 @@ export default function WorkspaceMenu({ hasResults, shareCount, snapshot, mapDis
       <DropdownMenuContent align="end" className="resource-finder min-w-52 font-sans">
         {hasResults && <DropdownMenuItem onClick={() => open("browse")}><SlidersHorizontal aria-hidden="true" />{t("Browse")}</DropdownMenuItem>}
         <DropdownMenuItem onClick={() => open("needs")}><UsersRound aria-hidden="true" />{t("Resident needs")}</DropdownMenuItem>
-        <DropdownMenuItem disabled={mapDisabled} onClick={map.open}><MapIcon aria-hidden="true" />{t("Map")}{map.count > 0 && <span className="bace-menu-count">{map.count}<span className="sr-only"> {t("mapped resources")}</span></span>}</DropdownMenuItem>
+        {showMap && <DropdownMenuItem disabled={mapDisabled} onClick={map.open}><MapIcon aria-hidden="true" />{t("Map")}{map.count > 0 && <span className="bace-menu-count">{map.count}<span className="sr-only"> {t("mapped resources")}</span></span>}</DropdownMenuItem>}
         {hasResults && <DropdownMenuItem onClick={() => open("share")}><Share2 aria-hidden="true" />{t("Share")}{shareCount > 0 && <span className="bace-menu-count">{shareCount}<span className="sr-only"> {t("selected")}</span></span>}</DropdownMenuItem>}
         <DropdownMenuItem onClick={() => open("help")}><CircleHelp aria-hidden="true" />{t("Guide")}</DropdownMenuItem>
         {onReset && <DropdownMenuItem onClick={onReset}><RotateCcw aria-hidden="true" />{t("New resident")}</DropdownMenuItem>}

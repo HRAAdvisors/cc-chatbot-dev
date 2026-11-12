@@ -50,7 +50,7 @@ export default function WorkspacePanel({ view, hasResults, onViewChange, onClose
   const popup = (
     <Dialog.Popup className={cn("resource-finder font-sans", isGuide ? "bace-guide-dialog" : "bace-workspace-panel")} initialFocus={isGuide ? () => document.querySelector<HTMLButtonElement>(".bace-guide-dialog [data-guide-close]") : closeRef} finalFocus={opener}>
       {!isGuide && <div className="bace-panel-heading flex shrink-0 items-center justify-between border-b border-border p-5">
-        <Dialog.Title className="text-lg font-semibold tracking-tight">{t(view === "needs" ? "Resident needs" : view === "share" ? "Resident's list" : "Browse resources")}</Dialog.Title>
+        <Dialog.Title className="text-lg font-semibold tracking-tight">{t(view === "needs" ? "Resident needs" : view === "share" ? "Resources to Share with Resident" : "Browse resources")}</Dialog.Title>
         <Dialog.Close ref={closeRef} render={<Button size="icon" variant="ghost" />} aria-label={t("Close panel")}>
           <PanelLeftClose aria-hidden="true" className="hidden sm:block" /><X aria-hidden="true" className="sm:hidden" />
         </Dialog.Close>

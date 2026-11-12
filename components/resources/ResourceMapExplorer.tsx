@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, ExternalLink, Layers, LocateFixed, MapPin, Search, Wifi } from "lucide-react";
+import { ArrowLeft, Check, ExternalLink, Layers, LocateFixed, MapPin, Search } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -68,7 +68,7 @@ export default function ResourceMapExplorer({ entries }: { entries: MapEntry[] }
 
   return <div className="resource-finder bace-map-page bg-background font-sans text-foreground">
     <header className="bace-header">
-      <Link href="/" aria-label={t("BACE Hub home")} className="bace-brand"><Wifi className="size-5" aria-hidden="true" /><span>BACE Hub</span></Link>
+      <Link href="/" aria-label={t("BACE Hub home")} className="bace-brand"><span>BACE <span className="bace-brand-hub">Hub</span></span></Link>
       <nav aria-label={t("Workspace tools")} className="bace-header-nav"><Link href="/" className="bace-header-link"><ArrowLeft className="size-4" aria-hidden="true" />{t(session?.result ? "Back to results" : "Back to search")}</Link><LanguageLink className="bace-header-link" /></nav>
     </header>
     <main className="bace-map-main">

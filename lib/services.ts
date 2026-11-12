@@ -1,7 +1,9 @@
+import { describeService } from './service-descriptions';
+
 // Auto-generated from digital_inclusion_resources_claude enhanced.xlsx
 // 108 services: 73 local, 35 national
 
-export const SERVICES = [
+const RAW_SERVICES = [
   { name: 'Alexander Library', type: 'Digital Skills Training', phone: '(702) 633-2880', url: 'https://www.learningexpresshub.com/ProductEngine/LELIndex.html#/learningexpresslibrary/libraryhome?authtoken=2c9804bd-ab08-4861-b958-86049fd11708', address: '1755 W Alexander Rd, North, Las Vegas, NV 89032', lat: 36.231806, long: -115.164766, description: 'Open to Clark County residents. Offers digital skills training via the EBSCO LearningExpress Library.', languages: 'English' },
   { name: 'Aliante Library', type: 'Digital Skills Training', phone: '(702) 839-2980', url: 'https://www.learningexpresshub.com/ProductEngine/LELIndex.html#/learningexpresslibrary/libraryhome?authtoken=2c9804bd-ab08-4861-b958-86049fd11708', address: '2400 W Deer Springs Way, North Las Vegas, NV 89084', lat: 36.28519, long: -115.175421, description: 'Open to Clark County residents. Offers digital skills training via the EBSCO LearningExpress Library.', languages: 'English' },
   { name: 'Blind Center of Nevada (BCN)', type: 'Digital Skills Training', phone: '(702) 642-6000', url: 'https://www.blindcenter.org/programs/computer-technology', address: '1001 N Bruce St, Las Vegas, NV 89101', lat: 36.182844, long: -115.125439, description: 'Open to BCN members. Offers guided instruction including shortcut key commands on a Windows PC, setting up a smartphone or tablet, master Microsoft Word and Excel, and develop employability skills.', languages: 'English' },
@@ -110,6 +112,9 @@ export const SERVICES = [
   { name: 'DigitalLearn.org (Public Library Association)', type: 'Digital Skills Training', phone: null, url: 'https://digitallearn.org/', address: 'Online / National', lat: null, long: null, description: 'Free self-paced online courses covering basic computer skills, internet use, email, social media safety, and job searching — designed for adult learners. Often used by libraries as a training platform.', languages: 'English' },
   { name: 'Digitunity', type: 'Device Access Resources', phone: null, url: 'https://www.digitunity.org/', address: 'Online / National', lat: null, long: null, description: 'National nonprofit that connects individuals and organizations to refurbished device programs, digital navigators, and digital inclusion resources nationwide. Maintains a directory of device programs available by zip code.', languages: 'English' },
 ];
+
+// Fill in a generic "About this program" for records that have no description (see lib/service-descriptions.ts).
+export const SERVICES = RAW_SERVICES.map((service) => ({ ...service, description: describeService(service) }));
 
 // Some records carry a comma-joined multi-type string (e.g. "Digital Skills
 // Training, Device Access Resources") — split those out before deduping.

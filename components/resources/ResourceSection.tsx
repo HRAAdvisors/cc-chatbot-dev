@@ -232,9 +232,7 @@ export function ResourceRow({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <CardTitle><h3 className="text-pretty">{resource.name}</h3></CardTitle>
-                <CardDescription>
-                  {plan ? t(plan.technology) : service ? serviceLocationLabel(service, t) : null}
-                </CardDescription>
+                {service && <CardDescription>{serviceLocationLabel(service, t)}</CardDescription>}
               </div>
               {plan && (
                 <div className="flex flex-col gap-1 text-right">
@@ -280,6 +278,7 @@ export function ResourceRow({
                       </Button>
                       <Button size="sm" variant="outline" onClick={onShare}>{t("Review share list")}</Button>
                     </div>
+                    <button type="button" className="bace-card-report self-start" onClick={onReport}>{t("Report a problem")}<span className="sr-only">: {resource.name}</span></button>
                   </div>
                 </div>
               </details>
@@ -288,7 +287,7 @@ export function ResourceRow({
           <CardFooter className="flex-wrap justify-between gap-3">
             <label className="flex min-h-10 cursor-pointer items-center gap-2 text-sm font-medium">
               <input type="checkbox" checked={selected} onChange={onToggle} className="size-4 shrink-0 accent-primary" />
-              {t(selected ? "In resident's list" : "Add to list")}
+              {t("Share with resident")}
               <span className="sr-only">: {resource.name}</span>
             </label>
             {resource.url && (
@@ -297,7 +296,6 @@ export function ResourceRow({
                 <ExternalLink data-icon="inline-end" aria-hidden="true" />
               </a>
             )}
-            <button type="button" className="bace-card-report" onClick={onReport}>{t("Report a problem")}<span className="sr-only">: {resource.name}</span></button>
           </CardFooter>
           {copied && <span role="status" className="sr-only">{t("Details copied.")}</span>}
         </Card>
