@@ -30,7 +30,7 @@ export default function PrintDialog({ count, hasConversation, addressCount = 0, 
             <div className="flex items-start justify-between gap-4">
               <div className="flex flex-col gap-1">
                 <Dialog.Title className="text-xl font-semibold tracking-tight text-primary">{t("What should we print?")}</Dialog.Title>
-                <Dialog.Description className="text-sm leading-relaxed text-muted-foreground">{t("The resident takes home only what you choose.")}</Dialog.Description>
+                <Dialog.Description className="text-sm leading-relaxed text-muted-foreground">{t("Share only the resources that you choose.")}</Dialog.Description>
               </div>
               <Dialog.Close render={<Button size="icon" variant="ghost" />} aria-label={t("Close")}><X aria-hidden="true" /></Dialog.Close>
             </div>
