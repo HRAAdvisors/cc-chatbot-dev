@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { sameAddress } from "@/lib/address-match";
+import ScopeTabs from "./ScopeTabs";
 import ChoiceButtons from "@/components/chat/ChoiceButtons";
 import ChatInput, { type SendOptions } from "@/components/chat/ChatInput";
 import SessionTimeout from "@/components/chat/SessionTimeout";
@@ -122,7 +123,6 @@ export default function ResourceFinder() {
   const home = !hasSession && !questionnaire;
   const tableView = !home && !questionnaire && view === "table" && !!result;
   const editableTable = tableOrigin === "needs";
-  const scopeLabel = focus === "all" ? "All resources" : CATEGORY_LABELS[focus];
   const hasResidentNeeds = hasNeeds(needs);
   const hasConversation = chat.messages.some((message) => message.role === "assistant" && message.content);
   const mapSnapshot = {
@@ -173,6 +173,7 @@ export default function ResourceFinder() {
   function openPanel(next: PanelView, opener?: HTMLElement | null) {
     panelOpener.current = opener ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     if (next !== "help") setTourRequested(false);
+    setListOpen(false);
     setPanel(next);
   }
 
@@ -217,9 +218,17 @@ export default function ResourceFinder() {
     setLastQuestion("");
   }
 
+  // On wide screens, slide the Browse panel open once a resource type is chosen so the other types stay one click away.
+  function openBrowseWhenWide() {
+    if (!window.matchMedia("(min-width: 1280px)").matches) return;
+    setTourRequested(false); setListOpen(false); setPanel("browse");
+    window.setTimeout(() => document.querySelector<HTMLInputElement>(".finder-chat-composer input")?.focus(), 120);
+  }
+
   function resolveScope(scope: ResourceFocus) {
     setAwaitingScope(null);
     setFocus(scope);
+    openBrowseWhenWide();
     setStatus(t("Now showing {type}. Previous replies are unchanged.", { type: t(scope === "all" ? "All resources" : CATEGORY_LABELS[scope]) }));
   }
 
@@ -237,8 +246,20 @@ export default function ResourceFinder() {
       requestAnimationFrame(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
     } else {
       setPending(null); setError("");
-      if (awaitingScope) resolveScope(inferResourceFocus(text));
+      const inferred = inferResourceFocus(text);
+      if (awaitingScope) resolveScope(inferred);
       if (!tableView) setView("chat");
+      if (!awaitingScope && result && !tableView && inferred !== "all" && inferred !== focus) {
+        // The question is about a different resource type: move the results below this message.
+        const anchor = chat.addUserMessage(text.trim());
+        setSearches((current) => current.map((search, index) => index === current.length - 1 ? { ...search, anchor } : search));
+        setResultAnchor(anchor); setFocus(inferred);
+        setLastQuestion(text);
+        void chat.send(text, { result, focus: inferred, replyOnly: true });
+        openBrowseWhenWide();
+        requestAnimationFrame(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
+        return;
+      }
       if (/find|help|near|available|resident|client|busc|ayud|cerca/i.test(text)) setLastQuestion(text);
       void chat.send(text);
       requestAnimationFrame(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
@@ -298,7 +319,8 @@ export default function ResourceFinder() {
       setSelected((current) => new Set([...current, id]));
       setOptOut((current) => { const next = new Set(current); next.delete(id); return next; });
       setDismissed((current) => { const next = new Set(current); next.delete(id); return next; });
-      if (showAside && window.matchMedia("(min-width: 1024px)").matches) setListOpen(true);
+      if (panel !== null && panel !== "help") setPanel("share");
+      else if (showAside && window.matchMedia("(min-width: 1024px)").matches) setListOpen(true);
     }
     setStatus("");
   }
@@ -398,8 +420,9 @@ export default function ResourceFinder() {
         {!data.found && <p className="text-muted-foreground">{t("We couldn't confirm internet plans for this address. This doesn't mean internet is unavailable; check with a provider. Device and training resources can still be explored.")}</p>}
         <div className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
           <MapPin className="size-4 shrink-0" aria-hidden="true" /><span className="min-w-0 break-words">{search.address}</span>
-          {isLatest && <><span aria-hidden="true">·</span><button type="button" className="bace-inline-action" onClick={startAddressChange}>{t(editing ? "Cancel" : "Change address")}</button><span aria-hidden="true">·</span><button type="button" className="bace-inline-action" onClick={() => openPanel("browse")} aria-haspopup="dialog">{t("Showing:")} {t(scopeLabel)}</button></>}
+          {isLatest && <><span aria-hidden="true">·</span><button type="button" className="bace-inline-action" onClick={startAddressChange}>{t(editing ? "Cancel" : "Change address")}</button></>}
         </div>
+        {isLatest && <ScopeTabs focus={focus} onChange={changeFocus} />}
       </div>
       <div className="flex flex-col gap-8">
         <CategoryColumns group={{ id: search.id, address: search.address, resources: groupResources }} visible={categories.filter((category) => !hiddenKeys.has(`${search.id}:${category}`))} latest={isLatest} selected={effectiveSelected} dismissed={dismissed} editable={false} needs={hasResidentNeeds ? needs : undefined} onToggle={toggle} onShare={shareResource} onReport={setReport} />
@@ -476,7 +499,7 @@ export default function ResourceFinder() {
               onChangeAddress={editableTable ? startAddressChange : undefined}
               onEditNeeds={editableTable ? () => { setNeedsDraft(needs); setQuestionnaire(true); } : undefined}
               onChat={editableTable ? () => { setView("chat"); setTableOrigin("chat"); setEditing(false); requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "instant" })); } : undefined}
-              focus={editableTable ? focus : "all"} needs={needs} scopeLabel={scopeLabel} onBrowse={editableTable ? () => openPanel("browse") : undefined} />
+              focus={editableTable ? focus : "all"} needs={needs} onFocusChange={editableTable ? changeFocus : undefined} />
           </div> : <div className="flex flex-1 flex-col gap-8">
             {!result && <h1 id="finder-title" className="sr-only">{t("Conversation")}</h1>}
             <ResourceConversation key={session} chat={chat} anchorId={resultAnchor} anchors={anchors} leading={unanchored.length ? unanchored : undefined} footer={<>{editing && <div className="flex flex-col gap-4">{input(true)}</div>}{lookupFeedback}</>} showFooter={editing || busy || !!error || !!pending} />
@@ -500,9 +523,6 @@ export default function ResourceFinder() {
       <WorkspacePanel view={panel} hasResults={!!result} onViewChange={setPanel} onClose={() => { setPanel(null); setTourRequested(false); }} opener={panelOpener}>
         {panel === "help" && <HowToUse key={tourRequested ? "tour" : "intro"} startTour={tourRequested} />}
         {panel === "browse" && <ResourceCategories resources={latestResources} focus={focus} onFocusChange={changeFocus} onJump={jump} onDone={() => setPanel(null)} />}
-        {panel === "needs" && <ResidentNeeds draft={needsDraft} onChange={setNeedsDraft} address={needsAddress} onAddressChange={setNeedsAddress} onShowResources={showNeedsResults} busy={busy}
-          onApply={() => { if (chat.busy) chat.cancel(); setNeeds(sanitizeNeeds(needsDraft)); setPanel(null); setStatus("Resident needs applied to future answers."); }}
-          onClear={() => { if (chat.busy) chat.cancel(); setNeeds(EMPTY_NEEDS); setNeedsDraft(EMPTY_NEEDS); setStatus("Resident needs cleared."); }} />}
         {panel === "share" && listPanel}
       </WorkspacePanel>
       <span role="status" className="sr-only">{t(status)}</span>

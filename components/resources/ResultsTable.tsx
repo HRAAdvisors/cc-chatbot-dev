@@ -9,6 +9,7 @@ import { matchResource } from "@/lib/resource-match";
 import { CATEGORIES, CATEGORY_LABELS, type Resource, type ResourceCategory } from "@/lib/resource-finder";
 import { ResourceRow, SortSelect, defaultSort, sortResources, type ResourceSort } from "./ResourceSection";
 import ShareActions from "./ShareActions";
+import ScopeTabs from "./ScopeTabs";
 
 const INITIAL_COUNT = 2;
 const SINGLE_COLUMN_COUNT = 3;
@@ -18,10 +19,10 @@ const ICONS = { internet: Wifi, devices: Laptop, skills: GraduationCap } as cons
 
 export interface TableGroup { id: string; address: string; resources: Resource[] }
 
-export default function ResultsTable({ groups, selected, shortlist, hiddenKeys, dismissed, editable, needsApplied, onToggle, onShare, onReport, onDismiss, onRemoveCategory, onRestore, onPrint, onBack, onChangeAddress, onEditNeeds, onChat, onBrowse, scopeLabel, focus = "all", needs }: {
+export default function ResultsTable({ groups, selected, shortlist, hiddenKeys, dismissed, editable, needsApplied, onToggle, onShare, onReport, onDismiss, onRemoveCategory, onRestore, onPrint, onBack, onChangeAddress, onEditNeeds, onChat, onFocusChange, focus = "all", needs }: {
   groups: TableGroup[]; selected: Set<string>; shortlist: Resource[]; hiddenKeys: Set<string>; dismissed: Set<string>; editable: boolean; needsApplied: boolean;
   onToggle: (id: string) => void; onShare: (resource: Resource) => void; onReport: (resource: Resource) => void; onDismiss?: (id: string) => void;
-  onRemoveCategory?: (groupId: string, category: ResourceCategory) => void; onRestore: () => void; onPrint: () => void; onBack?: () => void; onChangeAddress?: () => void; onEditNeeds?: () => void; onChat?: () => void; onBrowse?: () => void; scopeLabel?: string; focus?: ResourceFocus; needs?: ResidentNeeds;
+  onRemoveCategory?: (groupId: string, category: ResourceCategory) => void; onRestore: () => void; onPrint: () => void; onBack?: () => void; onChangeAddress?: () => void; onEditNeeds?: () => void; onChat?: () => void; onFocusChange?: (focus: ResourceFocus) => void; focus?: ResourceFocus; needs?: ResidentNeeds;
 }) {
   const { t } = useLanguage();
   const removedCount = hiddenKeys.size + dismissed.size;
@@ -57,9 +58,9 @@ export default function ResultsTable({ groups, selected, shortlist, hiddenKeys, 
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h2 id={`table-group-${group.id}`} className="flex items-center gap-2 text-base font-semibold"><MapPin className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /><span className="min-w-0 break-words">{group.address}</span></h2>
             {groupIndex === 0 && onChangeAddress && <button type="button" className="bace-inline-action" onClick={onChangeAddress}>{t("Change address")}</button>}
-            {groupIndex === 0 && onBrowse && <><span aria-hidden="true" className="text-sm text-muted-foreground">·</span><button type="button" className="bace-inline-action" onClick={onBrowse} aria-haspopup="dialog">{t("Showing:")} {t(scopeLabel ?? "All resources")}</button></>}
             {groupIndex > 0 && <span className="text-sm text-muted-foreground">{t("Earlier search")}</span>}
           </div>
+          {groupIndex === 0 && onFocusChange && <ScopeTabs focus={focus} onChange={onFocusChange} />}
           {!visible.length ? <div className="flex flex-col items-start gap-3 rounded-2xl border border-dashed border-border p-6">
             <p className="text-sm text-muted-foreground">{t("All categories were removed.")}</p>
             {editable && <Button variant="outline" onClick={onRestore}>{t("Restore removed ({count})", { count: removedCount })}</Button>}

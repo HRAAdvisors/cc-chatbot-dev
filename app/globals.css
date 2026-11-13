@@ -890,3 +890,10 @@ select:not([multiple]):not([size]) {
 /* Chat with inline category columns: widen the page, keep prose at a readable measure. */
 .bace-table-columns[data-count="1"] .bace-table-column > ul { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr)); gap: .75rem; }
 @media (min-width: 1024px) { .bace-app[data-list-aside="open"] .bace-table-columns[data-count="3"] { grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); } }
+
+.bace-scope-tabs { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; }
+.bace-scope-tab { display: inline-flex; min-height: 2.5rem; align-items: center; gap: .5rem; border: 1px solid var(--border); border-radius: 999px; background: var(--card); padding: 0 1rem; color: var(--foreground); font-size: .9375rem; line-height: 1.4; transition: background 150ms, border-color 150ms; }
+.bace-scope-tab:hover { border-color: var(--primary); }
+.bace-scope-tab[aria-pressed="true"] { border-color: var(--primary); background: var(--primary); color: var(--primary-foreground); }
+.resource-finder .bace-scope-tab[aria-pressed="true"] svg { color: var(--primary-foreground); }
+.bace-scope-tab:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary) 35%, transparent); outline-offset: 2px; }

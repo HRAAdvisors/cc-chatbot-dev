@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { Map as MapIcon, Menu, SlidersHorizontal, UsersRound, Share2, CircleHelp, RotateCcw } from "lucide-react";
+import { Map as MapIcon, Menu, SlidersHorizontal, Share2, CircleHelp, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useLanguage } from "@/components/chat/LanguageProvider";
@@ -24,7 +24,6 @@ export default function WorkspaceMenu({ hasResults, shareCount, snapshot, mapDis
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="resource-finder min-w-52 font-sans">
         {hasResults && <DropdownMenuItem onClick={() => open("browse")}><SlidersHorizontal aria-hidden="true" />{t("Browse")}</DropdownMenuItem>}
-        <DropdownMenuItem onClick={() => open("needs")}><UsersRound aria-hidden="true" />{t("Resident needs")}</DropdownMenuItem>
         {showMap && <DropdownMenuItem disabled={mapDisabled} onClick={map.open}><MapIcon aria-hidden="true" />{t("Map")}{map.count > 0 && <span className="bace-menu-count">{map.count}<span className="sr-only"> {t("mapped resources")}</span></span>}</DropdownMenuItem>}
         {hasResults && <DropdownMenuItem onClick={() => open("share")}><Share2 aria-hidden="true" />{t("Share")}{shareCount > 0 && <span className="bace-menu-count">{shareCount}<span className="sr-only"> {t("selected")}</span></span>}</DropdownMenuItem>}
         <DropdownMenuItem onClick={() => open("help")}><CircleHelp aria-hidden="true" />{t("Guide")}</DropdownMenuItem>
